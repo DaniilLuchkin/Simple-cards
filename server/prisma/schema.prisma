@@ -1,0 +1,50 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id         String   @id @default(uuid())
+  telegramId BigInt   @unique
+  username   String?
+  firstName  String?
+  createdAt  DateTime @default(now())
+
+  cards Card[]
+}
+
+enum CardStatus {
+  ACTIVE
+  GENERATING
+  FAILED
+}
+
+model Card {
+  id      String @id @default(uuid())
+  userId  String
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  word        String
+  example     String
+  explanation String
+  translation String
+  imageUrl    String?
+
+  status CardStatus @default(ACTIVE)
+
+  // SM2 scheduling state
+  easeFactor   Float    @default(2.5)
+  interval     Int      @default(0)
+  repetitions  Int      @default(0)
+  dueAt        DateTime @default(now())
+  lastReviewedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, dueAt])
+}

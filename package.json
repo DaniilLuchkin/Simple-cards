@@ -1,0 +1,15 @@
+{
+  "name": "simple-cards",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev:server": "pnpm --filter @simple-cards/server dev",
+    "dev:web": "pnpm --filter @simple-cards/web dev",
+    "build": "pnpm --filter @simple-cards/server build && pnpm --filter @simple-cards/web build",
+    "prisma:generate": "pnpm --filter @simple-cards/server prisma:generate",
+    "prisma:migrate": "pnpm --filter @simple-cards/server prisma:migrate"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

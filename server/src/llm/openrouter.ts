@@ -1,0 +1,131 @@
+import { env } from "../env.js";
+
+const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+
+type ChatContentPart =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string } };
+
+type ChatMessage = {
+  role: "system" | "user";
+  content: string | ChatContentPart[];
+};
+
+async function chatCompletion(messages: ChatMessage[]): Promise<string> {
+  const res = await fetch(OPENROUTER_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${env.OPENROUTER_API_KEY}`,
+      "Content-Type": "application/json",
+      ...(env.OPENROUTER_SITE_URL ? { "HTTP-Referer": env.OPENROUTER_SITE_URL } : {}),
+      "X-Title": env.OPENROUTER_APP_NAME,
+    },
+    body: JSON.stringify({
+      model: env.OPENROUTER_MODEL,
+      messages,
+      response_format: { type: "json_object" },
+      temperature: 0.4,
+    }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`OpenRouter request failed: ${res.status} ${body}`);
+  }
+
+  const data = (await res.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+  };
+  const content = data.choices?.[0]?.message?.content;
+  if (!content) throw new Error("OpenRouter response had no content");
+  return content;
+}
+
+export type GeneratedCardFields = {
+  word: string;
+  example: string;
+  explanation: string;
+  translation: string;
+};
+
+const SYSTEM_PROMPT = `You are a card-writing assistant for "Simple Cards", a Telegram mini app for learning English vocabulary.
+Given a word or phrase (and optionally a user-provided example sentence and/or an image), produce a flashcard.
+
+Rules:
+- "word": the canonical English word/phrase, cleaned up (fix obvious typos, keep user's intended word).
+- "example": one natural example sentence using the word. If the user provided their own example, reuse it (lightly fixed for grammar) instead of writing a new one.
+- "explanation": an explanation of the word's meaning written in SIMPLE English (B1 level, short sentences, no rare words), as if explaining to a learner. Do not just repeat the word.
+- "translation": an accurate Russian translation of the word/phrase (a short translation, not a sentence).
+
+Respond ONLY with a JSON object: {"word": string, "example": string, "explanation": string, "translation": string}`;
+
+export async function generateCard(input: {
+  word: string;
+  userExample?: string;
+  imageUrl?: string;
+}): Promise<GeneratedCardFields> {
+  const userParts: ChatContentPart[] = [
+    {
+      type: "text",
+      text: [
+        `Word or phrase: ${input.word}`,
+        input.userExample ? `User's example sentence: ${input.userExample}` : null,
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    },
+  ];
+
+  if (input.imageUrl) {
+    userParts.push({ type: "image_url", image_url: { url: input.imageUrl } });
+  }
+
+  const content = await chatCompletion([
+    { role: "system", content: SYSTEM_PROMPT },
+    { role: "user", content: userParts },
+  ]);
+
+  return parseGeneratedCard(content);
+}
+
+export async function regenerateCard(input: {
+  word: string;
+  previous: GeneratedCardFields;
+  userComment: string;
+}): Promise<GeneratedCardFields> {
+  const content = await chatCompletion([
+    { role: "system", content: SYSTEM_PROMPT },
+    {
+      role: "user",
+      content: [
+        `Word or phrase: ${input.word}`,
+        `Previous card: ${JSON.stringify(input.previous)}`,
+        `The user wants the card regenerated with this feedback: ${input.userComment}`,
+        "Produce an improved card following the same rules and JSON format.",
+      ].join("\n"),
+    },
+  ]);
+
+  return parseGeneratedCard(content);
+}
+
+function parseGeneratedCard(raw: string): GeneratedCardFields {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error(`LLM did not return valid JSON: ${raw}`);
+  }
+
+  const obj = parsed as Partial<GeneratedCardFields>;
+  if (!obj.word || !obj.example || !obj.explanation || !obj.translation) {
+    throw new Error(`LLM JSON missing required fields: ${raw}`);
+  }
+
+  return {
+    word: obj.word.trim(),
+    example: obj.example.trim(),
+    explanation: obj.explanation.trim(),
+    translation: obj.translation.trim(),
+  };
+}
