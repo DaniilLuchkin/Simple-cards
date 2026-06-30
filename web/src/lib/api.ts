@@ -1,6 +1,9 @@
 import { getInitData } from "./telegram";
 
-const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
+// Empty by default: in the combined single-service deployment the API is
+// served from the same origin as this app, so relative paths just work.
+// Set VITE_API_URL when running web/server as separate dev servers/services.
+const API_URL = import.meta.env.VITE_API_URL ?? "";
 
 export type Card = {
   id: string;

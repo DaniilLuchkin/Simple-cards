@@ -2,7 +2,7 @@ import type { Context } from "grammy";
 import { env } from "../../env.js";
 import { getOrCreateUser } from "../../services/userService.js";
 import { createCard } from "../../services/cardService.js";
-import { uploadImage } from "../../storage/s3.js";
+import { uploadImage } from "../../storage/localStorage.js";
 import { parseWordInput } from "../parseInput.js";
 import { pendingImageByChat } from "../state.js";
 import { miniAppKeyboard } from "../keyboard.js";

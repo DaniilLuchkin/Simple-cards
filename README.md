@@ -6,8 +6,12 @@ Telegram Mini App для изучения английских слов. При�
 
 ## Структура
 
-- `server/` — Express API + Telegram-бот (grammy) + Prisma/PostgreSQL, один процесс.
-- `web/` — Telegram Mini App (React + Vite + Tailwind), открывается кнопкой в боте.
+- `server/` — Express API + Telegram-бот (grammy) + Prisma/PostgreSQL.
+- `web/` — Telegram Mini App (React + Vite + Tailwind).
+
+В проде `server` отдаёт собранный `web/dist` как статику из того же процесса
+(см. `server/src/app.ts`) — это один деплой-юнит, см. «Деплой на Railway».
+В разработке удобнее гонять их раздельно (hot reload у Vite).
 
 ## Как это работает
 
@@ -29,90 +33,88 @@ Telegram Mini App для изучения английских слов. При�
 
 ## Быстрый старт (локально)
 
-### 1. Зависимости и инфраструктура
-
 ```bash
 pnpm install
-docker compose up -d   # postgres + minio (S3-совместимое хранилище картинок)
+docker compose up -d   # поднимает только postgres
 ```
-
-В MinIO консоли (http://localhost:9001, simplecards/simplecards123) создайте
-публичный bucket `simple-cards` (Access Policy → Public/Read для папки `cards/`),
-либо через `mc`:
-
-```bash
-mc alias set local http://localhost:9000 simplecards simplecards123
-mc mb local/simple-cards
-mc anonymous set download local/simple-cards
-```
-
-### 2. Сервер
 
 ```bash
 cd server
-cp .env.example .env   # заполните TELEGRAM_BOT_TOKEN, OPENROUTER_API_KEY, MINI_APP_URL
+cp .env.example .env   # заполните TELEGRAM_BOT_TOKEN, OPENROUTER_API_KEY
 pnpm prisma:migrate     # создаст таблицы
 pnpm dev                 # API на :3000 + бот (long polling)
 ```
 
+```bash
+cd web
+cp .env.example .env
+pnpm dev                 # http://localhost:5173, ходит в API на :3000
+```
+
 Бота создаёте через [@BotFather](https://t.me/BotFather): `/newbot`, токен — в
-`TELEGRAM_BOT_TOKEN`. `MINI_APP_URL` — это публичный HTTPS-адрес фронтенда
-(на проде; локально для теста кнопки в боте можно прокинуть `web` через ngrok/cloudflared,
-Telegram требует HTTPS для Web App).
+`TELEGRAM_BOT_TOKEN`. По умолчанию `MINI_APP_URL` смотрит на `localhost:3000`
+(локально это адрес собранной статики, если её собрать; для теста кнопки бота
+вживую нужен публичный HTTPS — Telegram требует его для Web App, проще всего
+сразу проверять задеплоенную версию).
 
 OpenRouter: ключ на https://openrouter.ai/keys, модель задаётся `OPENROUTER_MODEL`
 (например `anthropic/claude-3.5-haiku`, `openai/gpt-4o-mini` — переключайте свободно,
 для генерации по фото нужна модель с поддержкой vision).
 
-### 3. Mini App
+Картинки из бота сохраняются на диск в `UPLOADS_DIR` (по умолчанию `./uploads`
+внутри `server/`, в `.gitignore`) и отдаются сервером по `/uploads/...` —
+никакого внешнего объектного хранилища для локальной разработки не нужно.
 
-```bash
-cd web
-cp .env.example .env   # VITE_API_URL=http://localhost:3000
-pnpm dev                 # http://localhost:5173
-```
-
-Откройте через сам Telegram (Web App), чтобы `window.Telegram.WebApp.initData`
+Откройте Mini App через сам Telegram, чтобы `window.Telegram.WebApp.initData`
 был доступен — без него API отвечает 401 (см. `server/src/middleware/telegramAuth.ts`).
-Для удобной разработки в браузере без Telegram потребуется временно замокать
-`initData`/auth — в текущей версии аутентификация всегда требует реальный Telegram.
 
 ## Деплой на Railway
 
-Репозиторий — pnpm-монорепо (`server/` + `web/`), на Railway это два отдельных
-сервиса из одного репо, плюс плагин Postgres. Объектное хранилище (картинки)
-Railway "из коробки" не предоставляет — нужен внешний S3-совместимый сервис,
-проще всего [Cloudflare R2](https://developers.cloudflare.com/r2/) (есть
-бесплатный тариф, S3 API совместим 1-в-1 с тем, что уже реализовано в
-`server/src/storage/s3.ts`) или Backblaze B2.
+Самый простой вариант — **один сервис**: `server` на старте сам отдаёт собранный
+фронтенд (статикой) плюс API плюс бот. Никакого второго сервиса, никакого CORS
+между ними, никакого внешнего S3 — картинки лежат на Railway Volume.
 
-1. **Postgres** — в Railway-проекте: `New` → `Database` → `PostgreSQL`. Получите
-   переменную `DATABASE_URL` (или ссылайтесь на неё из сервиса `server` как
-   `${{ Postgres.DATABASE_URL }}`).
+1. **Postgres** — в проекте: `New` → `Database` → `PostgreSQL`.
 
-2. **Сервис `server`** — `New` → `GitHub Repo` → этот репозиторий.
-   - Settings → Build: Build Command —
-     `corepack enable && pnpm install --frozen-lockfile && pnpm --filter @simple-cards/server build`
-   - Settings → Deploy: Start Command — `pnpm --filter @simple-cards/server start`
-     (он сам прогонит `prisma migrate deploy` перед запуском, см. `server/package.json`)
-   - Variables: всё из `server/.env.example`, кроме `PORT` (его задаёт Railway
-     автоматически — Express и так слушает `process.env.PORT`). `DATABASE_URL`
-     возьмите из Postgres-плагина. `S3_*` — данные вашего R2/B2 bucket.
-     `CORS_ORIGIN` и `MINI_APP_URL` — публичный домен сервиса `web` (Railway
-     выдаёт `*.up.railway.app`, либо подключите свой домен).
+2. **Сервис** — `New` → `GitHub Repo` → этот репозиторий. Root Directory
+   оставьте корнем репо (нужен доступ и к `server/`, и к `web/`).
+   - Build Command:
+     `corepack enable && pnpm install --frozen-lockfile && pnpm --filter @simple-cards/web build && pnpm --filter @simple-cards/server build`
+   - Start Command: `pnpm --filter @simple-cards/server start`
+     (сам прогонит `prisma migrate deploy` перед запуском)
+   - Settings → Networking → **Generate Domain**. Как только домен появится,
+     Railway положит его в переменную `RAILWAY_PUBLIC_DOMAIN`, а сервер сам
+     возьмёт её для `MINI_APP_URL`/`CORS_ORIGIN`/`OPENROUTER_SITE_URL` —
+     вручную эти три задавать не нужно (см. `server/src/env.ts`).
    - Держите **1 instance/replica** — бот работает через long polling, два
      одновременных процесса будут конфликтовать за апдейты.
 
-3. **Сервис `web`** — тот же репозиторий, отдельный сервис.
-   - Build Command: `corepack enable && pnpm install --frozen-lockfile && pnpm --filter @simple-cards/web build`
-   - Start Command: `pnpm --filter @simple-cards/web start` (статика из `dist/`
-     отдаётся через `serve`, слушает `$PORT`)
-   - Variables: `VITE_API_URL` = публичный домен сервиса `server`. Это
-     **build-time** переменная (Vite вшивает её на этапе сборки) — задайте её
-     до первого деплоя, при смене значения нужен redeploy с пересборкой.
+3. **Переменные окружения** (Variables): только то, что реально нужно задать руками —
+   - `TELEGRAM_BOT_TOKEN`
+   - `OPENROUTER_API_KEY` (+ `OPENROUTER_MODEL`, если хотите модель не по умолчанию)
+   - `DATABASE_URL` = `${{ Postgres.DATABASE_URL }}`
 
-4. В BotFather командой `/setmenubutton` (или `/newapp`) укажите тот же URL
-   сервиса `web` — это то, что откроется по кнопке в боте.
+4. **Volume для картинок** (чтобы не терять их при редеплое) — Settings →
+   Volumes → Add Volume, mount path `/data`. Затем добавьте переменную
+   `UPLOADS_DIR=/data/uploads`. Без этого шага приложение тоже заработает —
+   картинки просто будут жить на эфемерном диске и пропадут при следующем
+   деплое/рестарте, для обкатки это нормально.
+
+5. В BotFather командой `/setmenubutton` (или `/newapp`) укажите тот же домен
+   сервиса — это то, что откроется по кнопке в боте.
+
+### Если всё же нужны два сервиса
+
+Например, если захочется отдавать фронтенд через CDN отдельно. Тогда:
+- `server`: тот же Build/Start, но без шага сборки `web`; задайте `MINI_APP_URL`
+  и `CORS_ORIGIN` вручную (домен сервиса `web`).
+- `web`: Build — `pnpm --filter @simple-cards/web build`, Start —
+  `pnpm --filter @simple-cards/web start` (раздаёт `dist/` через `serve`).
+  Переменная `VITE_API_URL` = домен сервиса `server` (build-time, нужен redeploy
+  при смене).
+- Картинки тогда отдаёт `server` со своего домена — `imageUrl` уже содержит
+  правильный абсолютный URL (берётся из `MINI_APP_URL`/`PUBLIC_ORIGIN`), так
+  что `web` ничего отдельно настраивать не нужно.
 
 ## Алгоритм повторения
 
@@ -133,5 +135,9 @@ Railway "из коробки" не предоставляет — нужен в�
   (не переживёт рестарт/масштабирование на несколько инстансов).
 - Нет отдельного экрана логина — единственный способ использования это Telegram Mini App.
 - Сгенерированная карточка добавляется в колоду сразу, без отдельного шага
-  подтверждения — осознанный выбор (см. историю изменений), правки и удаление
-  доступны позже во вкладке «Мои карточки» или прямо в стопке повторения.
+  подтверждения — осознанный выбор, правки и удаление доступны позже во
+  вкладке «Мои карточки» или прямо в стопке повторения.
+- Картинки хранятся на локальном диске сервиса (или Railway Volume), а не в
+  объектном хранилище — для одного инстанса этого достаточно; если позже
+  понадобится горизонтальное масштабирование сервера, нужно будет вернуться
+  к S3-совместимому хранилищу.
