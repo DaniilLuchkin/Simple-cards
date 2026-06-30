@@ -45,4 +45,9 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ comment }),
     }),
+  updateCard: (id: string, fields: Partial<Pick<Card, "word" | "example" | "explanation" | "translation">>) =>
+    request<{ card: Card }>(`/api/cards/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(fields),
+    }),
 };

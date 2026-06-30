@@ -83,6 +83,39 @@ cardsRouter.post("/:id/regenerate", async (req, res) => {
   }
 });
 
+const updateSchema = z
+  .object({
+    word: z.string().min(1).max(200),
+    example: z.string().min(1).max(500),
+    explanation: z.string().min(1).max(1000),
+    translation: z.string().min(1).max(300),
+  })
+  .partial()
+  .refine((data) => Object.keys(data).length > 0, { message: "No fields to update" });
+
+cardsRouter.patch("/:id", async (req, res) => {
+  const parsed = updateSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten() });
+    return;
+  }
+
+  const card = await prisma.card.findFirst({
+    where: { id: req.params.id, userId: req.dbUserId! },
+  });
+  if (!card) {
+    res.status(404).json({ error: "Card not found" });
+    return;
+  }
+
+  const updated = await prisma.card.update({
+    where: { id: card.id },
+    data: parsed.data,
+  });
+
+  res.json({ card: updated });
+});
+
 cardsRouter.delete("/:id", async (req, res) => {
   const card = await prisma.card.findFirst({
     where: { id: req.params.id, userId: req.dbUserId! },
