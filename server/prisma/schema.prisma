@@ -14,6 +14,9 @@ model User {
   firstName  String?
   createdAt  DateTime @default(now())
 
+  // When the daily word-of-the-day message was last sent to this user.
+  lastWordOfDayAt DateTime?
+
   cards Card[]
 }
 

@@ -19,8 +19,19 @@ export type Card = {
   explanation: string;
   translation: string;
   imageUrl: string | null;
+  // SM2 scheduling state - kept on the client so "undo last swipe" can send
+  // the pre-review snapshot back to the server.
+  easeFactor: number;
+  interval: number;
+  repetitions: number;
   dueAt: string;
+  lastReviewedAt: string | null;
 };
+
+export type Sm2Snapshot = Pick<
+  Card,
+  "easeFactor" | "interval" | "repetitions" | "dueAt" | "lastReviewedAt"
+>;
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
@@ -48,6 +59,11 @@ export const api = {
     request<{ card: Card }>(`/api/cards/${id}/review`, {
       method: "POST",
       body: JSON.stringify({ quality }),
+    }),
+  undoReview: (id: string, snapshot: Sm2Snapshot) =>
+    request<{ card: Card }>(`/api/cards/${id}/review/undo`, {
+      method: "POST",
+      body: JSON.stringify(snapshot),
     }),
   deleteCard: (id: string) => request<void>(`/api/cards/${id}`, { method: "DELETE" }),
   regenerateCard: (id: string, comment: string) =>

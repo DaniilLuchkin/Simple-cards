@@ -94,6 +94,37 @@ export async function generateCardFromImage(imageUrl: string): Promise<Generated
   return parseGeneratedCard(content);
 }
 
+const WORD_OF_DAY_SYSTEM_PROMPT = `You are the "word of the day" picker for "Simple Cards", a Telegram app for Russian speakers learning English vocabulary.
+
+Pick ONE genuinely useful English word or common expression (B1-C1 level): something a learner would actually use in conversation, work or travel. Not too basic (no "cat", "house"), not obscure academic jargon. Vary the part of speech and topic from day to day.
+
+You are given a list of words the user already has - do NOT pick any of them or their close forms.
+
+For the picked word produce flashcard fields following these rules:
+- "word": the word/expression itself.
+- "example": one natural example sentence using it.
+- "explanation": its meaning in SIMPLE English (B1 level, short sentences, no rare words). Do not just repeat the word.
+- "translation": an accurate Russian translation (short, not a sentence).
+
+Respond ONLY with a JSON object: {"word": string, "example": string, "explanation": string, "translation": string}`;
+
+export async function generateWordOfDay(existingWords: string[]): Promise<GeneratedCardFields> {
+  const content = await chatCompletion(
+    [
+      { role: "system", content: WORD_OF_DAY_SYSTEM_PROMPT },
+      {
+        role: "user",
+        content: existingWords.length
+          ? `Words the user already has (do not pick these): ${existingWords.join(", ")}`
+          : "The user has no cards yet - pick a great first word.",
+      },
+    ],
+    { temperature: 0.9 }
+  );
+
+  return parseGeneratedCard(content);
+}
+
 export async function regenerateCard(input: {
   word: string;
   previous: GeneratedCardFields;
@@ -115,7 +146,7 @@ export async function regenerateCard(input: {
   return parseGeneratedCard(content);
 }
 
-async function chatCompletion(messages: ChatMessage[]): Promise<string> {
+async function chatCompletion(messages: ChatMessage[], opts?: { temperature?: number }): Promise<string> {
   const res = await fetch(OPENROUTER_URL, {
     method: "POST",
     headers: {
@@ -128,7 +159,7 @@ async function chatCompletion(messages: ChatMessage[]): Promise<string> {
       model: env.OPENROUTER_MODEL,
       messages,
       response_format: { type: "json_object" },
-      temperature: 0.4,
+      temperature: opts?.temperature ?? 0.4,
     }),
   });
 

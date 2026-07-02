@@ -10,12 +10,20 @@ const VISIBLE_STACK = 3;
 
 export function CardStack({
   cards,
-  onConsumed,
+  practice,
+  canUndo,
+  onUndo,
+  onStartPractice,
+  onSwiped,
   onCardUpdated,
   onCardDeleted,
 }: {
   cards: Card[];
-  onConsumed: (card: Card) => void;
+  practice: boolean;
+  canUndo: boolean;
+  onUndo: () => void;
+  onStartPractice: () => void;
+  onSwiped: (card: Card, direction: "left" | "right") => void;
   onCardUpdated: (card: Card) => void;
   onCardDeleted: (cardId: string) => void;
 }) {
@@ -30,14 +38,9 @@ export function CardStack({
   const rememberOpacity = useTransform(dragX, [30, 140], [0, 1]);
   const forgotOpacity = useTransform(dragX, [-140, -30], [1, 0]);
 
-  async function handleSwiped(card: Card, direction: "left" | "right") {
+  function handleSwiped(card: Card, direction: "left" | "right") {
     dragX.set(0);
-    onConsumed(card);
-    try {
-      await api.reviewCard(card.id, direction === "right" ? "remembered" : "forgot");
-    } catch (err) {
-      console.error("Failed to record review", err);
-    }
+    onSwiped(card, direction);
   }
 
   async function handleDelete() {
@@ -67,18 +70,42 @@ export function CardStack({
     }
   }
 
+  const undoButton = canUndo && (
+    <button
+      type="button"
+      onClick={onUndo}
+      className="rounded-full bg-sky/40 px-5 py-2.5 text-sm font-medium text-ink shadow-soft dark:bg-sky/20"
+    >
+      ↩︎ {t("undo")}
+    </button>
+  );
+
   if (!top) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
         <p className="text-2xl">🎉</p>
-        <p className="text-lg font-medium text-ink">{t("emptyTitle")}</p>
+        <p className="text-lg font-medium text-ink">{practice ? t("practiceEmpty") : t("emptyTitle")}</p>
         <p className="max-w-xs text-sm text-muted">{t("emptyHint")}</p>
+        <div className="mt-2 flex items-center gap-3">
+          {undoButton}
+          <button
+            type="button"
+            onClick={onStartPractice}
+            className="rounded-full bg-mint/50 px-5 py-2.5 text-sm font-medium text-ink shadow-soft dark:bg-mint/25"
+          >
+            📚 {t("studyMore")}
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="flex h-full flex-col gap-4">
+      {practice && (
+        <p className="text-center text-xs text-muted">{t("practiceNote")}</p>
+      )}
+
       <div className="relative flex-1">
         {cards
           .slice(0, VISIBLE_STACK)
@@ -104,37 +131,38 @@ export function CardStack({
               </div>
             );
           })}
-
-        {/* Drag feedback: the interface tints green (right = "got it") or
-            red (left = "forgot") while the card is pulled. */}
-        <motion.div
-          style={{ opacity: rememberOpacity }}
-          className="pointer-events-none absolute inset-0 z-40 rounded-card bg-gradient-to-l from-emerald-400/40 via-emerald-400/10 to-transparent"
-        />
-        <motion.div
-          style={{ opacity: rememberOpacity }}
-          className="pointer-events-none absolute inset-y-0 right-2 z-40 flex items-center"
-        >
-          <span className="rounded-2xl bg-emerald-500/90 px-4 py-2 text-lg font-bold text-white shadow-soft">
-            ✓ {t("remember")}
-          </span>
-        </motion.div>
-
-        <motion.div
-          style={{ opacity: forgotOpacity }}
-          className="pointer-events-none absolute inset-0 z-40 rounded-card bg-gradient-to-r from-rose-400/40 via-rose-400/10 to-transparent"
-        />
-        <motion.div
-          style={{ opacity: forgotOpacity }}
-          className="pointer-events-none absolute inset-y-0 left-2 z-40 flex items-center"
-        >
-          <span className="rounded-2xl bg-rose-500/90 px-4 py-2 text-lg font-bold text-white shadow-soft">
-            ✕ {t("forgot")}
-          </span>
-        </motion.div>
       </div>
 
+      {/* Drag feedback: the whole viewport tints green (right = "got it") or
+          red (left = "forgot") while the card is pulled. */}
+      <motion.div
+        style={{ opacity: rememberOpacity }}
+        className="pointer-events-none fixed inset-0 z-40 bg-gradient-to-l from-emerald-400/50 via-emerald-400/15 to-transparent"
+      />
+      <motion.div
+        style={{ opacity: rememberOpacity }}
+        className="pointer-events-none fixed inset-y-0 right-3 z-40 flex items-center"
+      >
+        <span className="rounded-2xl bg-emerald-500/90 px-4 py-2 text-lg font-bold text-white shadow-soft">
+          ✓ {t("remember")}
+        </span>
+      </motion.div>
+
+      <motion.div
+        style={{ opacity: forgotOpacity }}
+        className="pointer-events-none fixed inset-0 z-40 bg-gradient-to-r from-rose-400/50 via-rose-400/15 to-transparent"
+      />
+      <motion.div
+        style={{ opacity: forgotOpacity }}
+        className="pointer-events-none fixed inset-y-0 left-3 z-40 flex items-center"
+      >
+        <span className="rounded-2xl bg-rose-500/90 px-4 py-2 text-lg font-bold text-white shadow-soft">
+          ✕ {t("forgot")}
+        </span>
+      </motion.div>
+
       <div className="flex items-center justify-center gap-3 pb-2">
+        {undoButton}
         <button
           type="button"
           disabled={busy}

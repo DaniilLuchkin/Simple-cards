@@ -1,5 +1,6 @@
 import { prisma } from "./db.js";
 import { generateCard, generateCardFromImage, regenerateCard } from "./llm.js";
+import type { GeneratedCardFields } from "./llm.js";
 import { absoluteImageUrl } from "./storage.js";
 
 export async function getOrCreateUser(input: {
@@ -34,6 +35,25 @@ export async function createCard(input: {
   return prisma.card.create({
     data: { userId: input.userId, ...fields, imageUrl: input.imagePath },
   });
+}
+
+// For flows where the fields were already generated (e.g. accepting the word
+// of the day) - no LLM round-trip.
+export function createCardFromFields(input: { userId: string; fields: GeneratedCardFields }) {
+  return prisma.card.create({
+    data: { userId: input.userId, ...input.fields },
+  });
+}
+
+// Recent vocabulary, used to keep the word of the day from repeating cards.
+export async function listUserWords(userId: string, limit = 150): Promise<string[]> {
+  const cards = await prisma.card.findMany({
+    where: { userId },
+    orderBy: { createdAt: "desc" },
+    take: limit,
+    select: { word: true },
+  });
+  return cards.map((c) => c.word);
 }
 
 // Returns null when the photo isn't obvious enough to name confidently.

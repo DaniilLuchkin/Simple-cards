@@ -1,9 +1,10 @@
 import { Bot, InlineKeyboard } from "grammy";
 import type { Context } from "grammy";
 import { env } from "./env.js";
-import { createCard, createCardFromImage, getOrCreateUser } from "./services.js";
+import { createCard, createCardFromFields, createCardFromImage, getOrCreateUser } from "./services.js";
 import { saveImage } from "./storage.js";
 import { parseWordInput } from "./parseInput.js";
+import { parseWordOfDayMessage, sendWordOfDay } from "./wordOfDay.js";
 
 export const bot = new Bot(env.TELEGRAM_BOT_TOKEN);
 
@@ -33,6 +34,7 @@ export async function setupBotProfile() {
     await bot.api.setMyCommands([
       { command: "start", description: "Как пользоваться ботом" },
       { command: "app", description: "Открыть Simple Cards" },
+      { command: "word", description: "Слово дня прямо сейчас" },
     ]);
     await bot.api.raw.setChatMenuButton({
       menu_button: { type: "web_app", text: "Карточки", web_app: { url: env.MINI_APP_URL } },
@@ -55,6 +57,45 @@ bot.command("start", (ctx) => ctx.reply(WELCOME_TEXT, { reply_markup: miniAppKey
 bot.command("app", (ctx) =>
   ctx.reply("Открой Simple Cards, чтобы повторять карточки:", { reply_markup: miniAppKeyboard })
 );
+
+bot.command("word", async (ctx) => {
+  try {
+    const user = await userFromCtx(ctx);
+    await sendWordOfDay(bot, user);
+  } catch (err) {
+    console.error("On-demand word of day failed", err);
+    await ctx.reply("Не получилось подобрать слово. Попробуй ещё раз чуть позже.");
+  }
+});
+
+// "Add" button under a word-of-the-day message: the card fields are parsed
+// back out of the message text itself, so the button works across restarts.
+bot.callbackQuery("wod:add", async (ctx) => {
+  const text = ctx.callbackQuery.message?.text;
+  const fields = text ? parseWordOfDayMessage(text) : null;
+  if (!fields) {
+    await ctx.answerCallbackQuery({ text: "Не удалось прочитать слово — пришли его текстом." });
+    return;
+  }
+
+  try {
+    const user = await userFromCtx(ctx);
+    await createCardFromFields({ userId: user.id, fields });
+    await ctx.answerCallbackQuery({ text: "Добавлено!" });
+    await ctx.editMessageReplyMarkup(); // drop the buttons
+    await ctx.reply(`Готово! Карточка для «${fields.word}» добавлена.`, {
+      reply_markup: miniAppKeyboard,
+    });
+  } catch (err) {
+    console.error("Failed to add word of day", err);
+    await ctx.answerCallbackQuery({ text: "Не получилось добавить. Попробуй ещё раз." });
+  }
+});
+
+bot.callbackQuery("wod:skip", async (ctx) => {
+  await ctx.answerCallbackQuery();
+  await ctx.editMessageReplyMarkup(); // drop the buttons
+});
 
 bot.on("message:photo", async (ctx) => {
   const statusMsg = await ctx.reply("Загружаю картинку…");

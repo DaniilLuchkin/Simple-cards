@@ -60,6 +60,46 @@ cardsRouter.post("/:id/review", async (req, res) => {
   res.json({ card: toApiCard(updated) });
 });
 
+// Restores the SM2 state a card had before its last review, so the client can
+// offer "undo last swipe". The client sends back the snapshot it took before
+// reviewing; values are bounded to what sm2() can legitimately produce.
+const undoSchema = z.object({
+  easeFactor: z.number().min(1.3).max(10),
+  interval: z.number().int().min(0).max(36500),
+  repetitions: z.number().int().min(0).max(10000),
+  dueAt: z.string().datetime(),
+  lastReviewedAt: z.string().datetime().nullable(),
+});
+
+cardsRouter.post("/:id/review/undo", async (req, res) => {
+  const parsed = undoSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten() });
+    return;
+  }
+
+  const card = await prisma.card.findFirst({
+    where: { id: req.params.id, userId: req.dbUserId! },
+  });
+  if (!card) {
+    res.status(404).json({ error: "Card not found" });
+    return;
+  }
+
+  const updated = await prisma.card.update({
+    where: { id: card.id },
+    data: {
+      easeFactor: parsed.data.easeFactor,
+      interval: parsed.data.interval,
+      repetitions: parsed.data.repetitions,
+      dueAt: new Date(parsed.data.dueAt),
+      lastReviewedAt: parsed.data.lastReviewedAt ? new Date(parsed.data.lastReviewedAt) : null,
+    },
+  });
+
+  res.json({ card: toApiCard(updated) });
+});
+
 const regenerateSchema = z.object({
   comment: z.string().min(1).max(500),
 });

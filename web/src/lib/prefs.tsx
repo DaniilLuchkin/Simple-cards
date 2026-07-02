@@ -34,6 +34,10 @@ const STRINGS = {
     done: "Готово",
     libEmpty: "Карточек пока нет. Пришли слово боту, чтобы создать первую.",
     nextReview: "Повторение",
+    studyMore: "Учить ещё",
+    practiceEmpty: "Тренировка пройдена!",
+    practiceNote: "Тренировка — расписание повторений не меняется",
+    undo: "Отменить",
   },
   en: {
     tabReview: "Review",
@@ -63,6 +67,10 @@ const STRINGS = {
     done: "Done",
     libEmpty: "No cards yet. Send the bot a word to create your first one.",
     nextReview: "Next review",
+    studyMore: "Study more",
+    practiceEmpty: "Practice complete!",
+    practiceNote: "Practice — review schedule is not affected",
+    undo: "Undo",
   },
 } as const;
 

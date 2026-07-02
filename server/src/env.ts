@@ -33,6 +33,9 @@ const schema = z.object({
   OPENROUTER_MODEL: z.string().default("anthropic/claude-3.5-haiku"),
   OPENROUTER_APP_NAME: z.string().default("Simple Cards"),
 
+  // UTC hour at which the daily word-of-the-day is sent (9 = 12:00 MSK).
+  WORD_OF_DAY_UTC_HOUR: z.coerce.number().int().min(0).max(23).default(9),
+
   // Where uploaded card images are stored on disk. Point this at a mounted
   // volume (e.g. /data/uploads) for persistence across deploys.
   UPLOADS_DIR: z.string().default("uploads"),
