@@ -29,7 +29,7 @@ export function Library({
           key={card.id}
           type="button"
           onClick={() => setSelectedId(card.id)}
-          className="flex items-center gap-3 rounded-2xl bg-mint/30 p-4 text-left shadow-soft"
+          className="flex items-center gap-3 rounded-2xl bg-mint-fill p-4 text-left shadow-soft"
         >
           {card.imageUrl && (
             <img

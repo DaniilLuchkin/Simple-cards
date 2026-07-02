@@ -36,12 +36,12 @@ export function FlipCard({ card, flipped }: { card: Card; flipped: boolean }) {
 
 function CardFront({ card }: { card: Card }) {
   return (
-    <div className="flex h-full w-full flex-col gap-5 rounded-card bg-sky/40 p-7">
+    <div className="flex h-full w-full flex-col gap-5 rounded-card bg-sky-fill p-7">
       {card.imageUrl && (
         <img
           src={card.imageUrl}
           alt=""
-          className="h-40 w-full rounded-2xl object-cover shadow-soft"
+          className="mx-auto max-h-[45%] max-w-full rounded-2xl object-contain shadow-soft"
           // If the file is gone (e.g. deploy without a persistent volume),
           // hide the slot instead of showing a broken-image icon.
           onError={(e) => (e.currentTarget.style.display = "none")}
@@ -66,7 +66,7 @@ function CardBack({
   onRevealTranslation: () => void;
 }) {
   return (
-    <div className="flex h-full w-full flex-col gap-5 rounded-card bg-lilac/40 p-7">
+    <div className="flex h-full w-full flex-col gap-5 rounded-card bg-lilac-fill p-7">
       <div className="flex flex-1 flex-col items-center justify-center gap-6 text-center">
         <p className="text-lg leading-relaxed text-ink">{card.explanation}</p>
         <button

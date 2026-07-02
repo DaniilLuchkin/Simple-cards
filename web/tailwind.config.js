@@ -14,6 +14,12 @@ export default {
         butter: "#fff3c4",
         ink: "#3a3a45",
         muted: "#8b8b96",
+        // Opaque fills that look like the pastels above at 30-40% opacity on
+        // white. Card faces must not be translucent - stacked cards would
+        // show through each other.
+        "sky-fill": "#ecf5ff",
+        "lilac-fill": "#f4efff",
+        "mint-fill": "#effaf6",
       },
       fontFamily: {
         sans: ["-apple-system", "BlinkMacSystemFont", "Segoe UI", "Roboto", "sans-serif"],
