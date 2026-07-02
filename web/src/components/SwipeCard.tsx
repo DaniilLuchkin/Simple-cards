@@ -1,4 +1,5 @@
 import { motion, useAnimation, useMotionValue, useTransform } from "framer-motion";
+import type { MotionValue } from "framer-motion";
 import { useState } from "react";
 import type { Card } from "../lib/api";
 import { FlipCard } from "./CardView";
@@ -9,18 +10,20 @@ const SWIPE_THRESHOLD = 120;
 export function SwipeCard({
   card,
   active,
+  dragX,
   onSwiped,
 }: {
   card: Card;
   active: boolean;
+  // Provided for the top card so the stack can render drag feedback.
+  dragX?: MotionValue<number>;
   onSwiped: (direction: "left" | "right") => void;
 }) {
   const [flipped, setFlipped] = useState(false);
   const controls = useAnimation();
-  const x = useMotionValue(0);
+  const localX = useMotionValue(0);
+  const x = dragX ?? localX;
   const rotate = useTransform(x, [-300, 300], [-18, 18]);
-  const rememberOpacity = useTransform(x, [20, 140], [0, 1]);
-  const forgotOpacity = useTransform(x, [-140, -20], [1, 0]);
 
   async function handleDragEnd(_: unknown, info: { offset: { x: number } }) {
     if (!active) return;
@@ -54,19 +57,6 @@ export function SwipeCard({
       }}
     >
       <FlipCard card={card} flipped={flipped} />
-
-      <motion.div
-        style={{ opacity: rememberOpacity }}
-        className="pointer-events-none absolute right-6 top-6 rotate-12 rounded-xl border-2 border-mint bg-white/80 px-4 py-1.5 text-sm font-bold uppercase tracking-wide text-mint"
-      >
-        Помню
-      </motion.div>
-      <motion.div
-        style={{ opacity: forgotOpacity }}
-        className="pointer-events-none absolute left-6 top-6 -rotate-12 rounded-xl border-2 border-blush bg-white/80 px-4 py-1.5 text-sm font-bold uppercase tracking-wide text-blush"
-      >
-        Забыл
-      </motion.div>
     </motion.div>
   );
 }

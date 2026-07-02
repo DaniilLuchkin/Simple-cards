@@ -1,6 +1,8 @@
+import { motion, useMotionValue, useTransform } from "framer-motion";
 import { useState } from "react";
 import type { Card } from "../lib/api";
 import { api } from "../lib/api";
+import { usePrefs } from "../lib/prefs";
 import { SwipeCard } from "./SwipeCard";
 import { RegenerateModal } from "./RegenerateModal";
 
@@ -17,11 +19,19 @@ export function CardStack({
   onCardUpdated: (card: Card) => void;
   onCardDeleted: (cardId: string) => void;
 }) {
+  const { t } = usePrefs();
   const [regenerating, setRegenerating] = useState(false);
   const [busy, setBusy] = useState(false);
   const top = cards[0];
 
+  // Shared with the active card so the feedback overlays below can react to
+  // the drag in real time.
+  const dragX = useMotionValue(0);
+  const rememberOpacity = useTransform(dragX, [30, 140], [0, 1]);
+  const forgotOpacity = useTransform(dragX, [-140, -30], [1, 0]);
+
   async function handleSwiped(card: Card, direction: "left" | "right") {
+    dragX.set(0);
     onConsumed(card);
     try {
       await api.reviewCard(card.id, direction === "right" ? "remembered" : "forgot");
@@ -61,10 +71,8 @@ export function CardStack({
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
         <p className="text-2xl">🎉</p>
-        <p className="text-lg font-medium text-ink">Карточек на повторение пока нет</p>
-        <p className="max-w-xs text-sm text-muted">
-          Пришли боту новое слово, картинку или загляни позже — карточки появятся по расписанию.
-        </p>
+        <p className="text-lg font-medium text-ink">{t("emptyTitle")}</p>
+        <p className="max-w-xs text-sm text-muted">{t("emptyHint")}</p>
       </div>
     );
   }
@@ -90,11 +98,40 @@ export function CardStack({
                 <SwipeCard
                   card={card}
                   active={isTop}
+                  dragX={isTop ? dragX : undefined}
                   onSwiped={(dir) => handleSwiped(card, dir)}
                 />
               </div>
             );
           })}
+
+        {/* Drag feedback: the interface tints green (right = "got it") or
+            red (left = "forgot") while the card is pulled. */}
+        <motion.div
+          style={{ opacity: rememberOpacity }}
+          className="pointer-events-none absolute inset-0 z-40 rounded-card bg-gradient-to-l from-emerald-400/40 via-emerald-400/10 to-transparent"
+        />
+        <motion.div
+          style={{ opacity: rememberOpacity }}
+          className="pointer-events-none absolute inset-y-0 right-2 z-40 flex items-center"
+        >
+          <span className="rounded-2xl bg-emerald-500/90 px-4 py-2 text-lg font-bold text-white shadow-soft">
+            ✓ {t("remember")}
+          </span>
+        </motion.div>
+
+        <motion.div
+          style={{ opacity: forgotOpacity }}
+          className="pointer-events-none absolute inset-0 z-40 rounded-card bg-gradient-to-r from-rose-400/40 via-rose-400/10 to-transparent"
+        />
+        <motion.div
+          style={{ opacity: forgotOpacity }}
+          className="pointer-events-none absolute inset-y-0 left-2 z-40 flex items-center"
+        >
+          <span className="rounded-2xl bg-rose-500/90 px-4 py-2 text-lg font-bold text-white shadow-soft">
+            ✕ {t("forgot")}
+          </span>
+        </motion.div>
       </div>
 
       <div className="flex items-center justify-center gap-3 pb-2">
@@ -102,17 +139,17 @@ export function CardStack({
           type="button"
           disabled={busy}
           onClick={handleDelete}
-          className="rounded-full bg-blush/40 px-5 py-2.5 text-sm font-medium text-ink shadow-soft disabled:opacity-50"
+          className="rounded-full bg-blush/40 px-5 py-2.5 text-sm font-medium text-ink shadow-soft disabled:opacity-50 dark:bg-blush/20"
         >
-          Удалить
+          {t("delete")}
         </button>
         <button
           type="button"
           disabled={busy}
           onClick={() => setRegenerating(true)}
-          className="rounded-full bg-butter/50 px-5 py-2.5 text-sm font-medium text-ink shadow-soft disabled:opacity-50"
+          className="rounded-full bg-butter/50 px-5 py-2.5 text-sm font-medium text-ink shadow-soft disabled:opacity-50 dark:bg-butter/20"
         >
-          Перегенерировать
+          {t("regenerate")}
         </button>
       </div>
 

@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { useState } from "react";
 import type { Card } from "../lib/api";
+import { usePrefs } from "../lib/prefs";
 
 /**
  * Two-sided card with a 3D flip. `flipped` is controlled by the parent
@@ -35,6 +36,7 @@ export function FlipCard({ card, flipped }: { card: Card; flipped: boolean }) {
 }
 
 function CardFront({ card }: { card: Card }) {
+  const { t } = usePrefs();
   return (
     <div className="flex h-full w-full flex-col gap-5 rounded-card bg-sky-fill p-7">
       {card.imageUrl && (
@@ -51,7 +53,7 @@ function CardFront({ card }: { card: Card }) {
         <h2 className="text-3xl font-semibold text-ink">{card.word}</h2>
         <p className="text-base text-muted">{card.example}</p>
       </div>
-      <p className="text-center text-xs text-muted/70">Нажми, чтобы перевернуть</p>
+      <p className="text-center text-xs text-muted/70">{t("tapFlip")}</p>
     </div>
   );
 }
@@ -65,6 +67,7 @@ function CardBack({
   translationRevealed: boolean;
   onRevealTranslation: () => void;
 }) {
+  const { t } = usePrefs();
   return (
     <div className="flex h-full w-full flex-col gap-5 rounded-card bg-lilac-fill p-7">
       <div className="flex flex-1 flex-col items-center justify-center gap-6 text-center">
@@ -80,12 +83,12 @@ function CardBack({
             e.stopPropagation();
             onRevealTranslation();
           }}
-          className="rounded-2xl bg-white/60 px-5 py-3 text-lg font-medium text-ink shadow-soft transition"
+          className="rounded-2xl bg-white/60 px-5 py-3 text-lg font-medium text-ink shadow-soft transition dark:bg-white/10"
         >
           <span className={translationRevealed ? "" : "blur-sm select-none"}>{card.translation}</span>
         </button>
       </div>
-      <p className="text-center text-xs text-muted/70">Нажми ещё раз, чтобы вернуться</p>
+      <p className="text-center text-xs text-muted/70">{t("tapBack")}</p>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { Card } from "../lib/api";
+import { usePrefs } from "../lib/prefs";
 import { CardDetail } from "./CardDetail";
 
 export function Library({
@@ -11,13 +12,14 @@ export function Library({
   onCardUpdated: (card: Card) => void;
   onCardDeleted: (cardId: string) => void;
 }) {
+  const { t, lang } = usePrefs();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selectedCard = cards.find((c) => c.id === selectedId) ?? null;
 
   if (cards.length === 0) {
     return (
       <div className="flex h-full items-center justify-center text-center text-sm text-muted">
-        Карточек пока нет. Пришли слово боту, чтобы создать первую.
+        {t("libEmpty")}
       </div>
     );
   }
@@ -43,7 +45,7 @@ export function Library({
             <p className="truncate text-base font-semibold text-ink">{card.word}</p>
             <p className="truncate text-sm text-muted">{card.example}</p>
             <p className="mt-1 text-xs text-muted/70">
-              Повторение: {new Date(card.dueAt).toLocaleDateString("ru-RU")}
+              {t("nextReview")}: {new Date(card.dueAt).toLocaleDateString(lang === "ru" ? "ru-RU" : "en-US")}
             </p>
           </div>
           <span className="shrink-0 text-muted/60">›</span>
