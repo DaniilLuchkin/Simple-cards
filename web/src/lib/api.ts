@@ -3,7 +3,14 @@ import { getInitData } from "./telegram";
 // Empty by default: in the combined single-service deployment the API is
 // served from the same origin as this app, so relative paths just work.
 // Set VITE_API_URL when running web/server as separate dev servers/services.
-const API_URL = import.meta.env.VITE_API_URL ?? "";
+// Tolerates common paste mistakes (stray whitespace/quotes, missing scheme,
+// trailing slash) - an invalid URL here makes every fetch throw a cryptic
+// SyntaxError on WebKit.
+const API_URL = (() => {
+  const cleaned = (import.meta.env.VITE_API_URL ?? "").replace(/[\s"']+/g, "").replace(/\/+$/, "");
+  if (!cleaned) return "";
+  return /^https?:\/\//.test(cleaned) ? cleaned : `https://${cleaned}`;
+})();
 
 export type Card = {
   id: string;

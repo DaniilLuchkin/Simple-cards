@@ -58,6 +58,42 @@ export async function generateCard(input: {
   return parseGeneratedCard(content);
 }
 
+const IMAGE_SYSTEM_PROMPT = `You are a card-writing assistant for "Simple Cards", a Telegram mini app for learning English vocabulary.
+The user sent a photo without any text. Identify the single most prominent object, action or concept in the photo.
+
+- If you can identify it confidently (a clear everyday object like headphones, a cup, a dog), produce a flashcard for its common English name following these rules:
+  - "word": the common English word for what's in the photo.
+  - "example": one natural example sentence using the word.
+  - "explanation": the word's meaning in SIMPLE English (B1 level, short sentences, no rare words). Do not just repeat the word.
+  - "translation": an accurate Russian translation of the word (short, not a sentence).
+  Respond: {"recognized": true, "word": string, "example": string, "explanation": string, "translation": string}
+- If the photo is ambiguous, abstract, or could reasonably be named many different ways, respond: {"recognized": false}
+
+Respond ONLY with the JSON object.`;
+
+// Returns null when the model can't confidently name what's in the photo.
+export async function generateCardFromImage(imageUrl: string): Promise<GeneratedCardFields | null> {
+  const content = await chatCompletion([
+    { role: "system", content: IMAGE_SYSTEM_PROMPT },
+    {
+      role: "user",
+      content: [
+        { type: "text", text: "What is in this photo? Make a flashcard if it's obvious." },
+        { type: "image_url", image_url: { url: imageUrl } },
+      ],
+    },
+  ]);
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    throw new Error(`LLM did not return valid JSON: ${content}`);
+  }
+  if (!(parsed as { recognized?: boolean }).recognized) return null;
+  return parseGeneratedCard(content);
+}
+
 export async function regenerateCard(input: {
   word: string;
   previous: GeneratedCardFields;

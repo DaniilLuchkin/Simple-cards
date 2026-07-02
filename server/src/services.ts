@@ -1,5 +1,5 @@
 import { prisma } from "./db.js";
-import { generateCard, regenerateCard } from "./llm.js";
+import { generateCard, generateCardFromImage, regenerateCard } from "./llm.js";
 
 export async function getOrCreateUser(input: {
   telegramId: bigint;
@@ -28,6 +28,16 @@ export async function createCard(input: {
     userExample: input.userExample,
     imageUrl: input.imageUrl,
   });
+
+  return prisma.card.create({
+    data: { userId: input.userId, ...fields, imageUrl: input.imageUrl },
+  });
+}
+
+// Returns null when the photo isn't obvious enough to name confidently.
+export async function createCardFromImage(input: { userId: string; imageUrl: string }) {
+  const fields = await generateCardFromImage(input.imageUrl);
+  if (!fields) return null;
 
   return prisma.card.create({
     data: { userId: input.userId, ...fields, imageUrl: input.imageUrl },
