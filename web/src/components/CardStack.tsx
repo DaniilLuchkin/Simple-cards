@@ -125,7 +125,7 @@ export function CardStack({
                 <SwipeCard
                   card={card}
                   active={isTop}
-                  dragX={isTop ? dragX : undefined}
+                  reportDragX={isTop ? dragX : undefined}
                   onSwiped={(dir) => handleSwiped(card, dir)}
                 />
               </div>

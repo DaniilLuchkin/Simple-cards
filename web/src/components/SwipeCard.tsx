@@ -10,32 +10,41 @@ const SWIPE_THRESHOLD = 120;
 export function SwipeCard({
   card,
   active,
-  dragX,
+  reportDragX,
   onSwiped,
 }: {
   card: Card;
   active: boolean;
-  // Provided for the top card so the stack can render drag feedback.
-  dragX?: MotionValue<number>;
+  // The stack's shared drag-position value, mirrored here so it can render
+  // full-screen swipe feedback. Kept separate from this card's own `x` so the
+  // card's transform value never changes identity when it becomes the top
+  // card - swapping the backing motion value breaks framer-motion's drag.
+  reportDragX?: MotionValue<number>;
   onSwiped: (direction: "left" | "right") => void;
 }) {
   const [flipped, setFlipped] = useState(false);
   const controls = useAnimation();
-  const localX = useMotionValue(0);
-  const x = dragX ?? localX;
+  const x = useMotionValue(0);
   const rotate = useTransform(x, [-300, 300], [-18, 18]);
+
+  function handleDrag(_: unknown, info: { offset: { x: number } }) {
+    if (active) reportDragX?.set(info.offset.x);
+  }
 
   async function handleDragEnd(_: unknown, info: { offset: { x: number } }) {
     if (!active) return;
     if (info.offset.x > SWIPE_THRESHOLD) {
       haptic("medium");
+      reportDragX?.set(0);
       await controls.start({ x: 600, rotate: 20, opacity: 0, transition: { duration: 0.25 } });
       onSwiped("right");
     } else if (info.offset.x < -SWIPE_THRESHOLD) {
       haptic("medium");
+      reportDragX?.set(0);
       await controls.start({ x: -600, rotate: -20, opacity: 0, transition: { duration: 0.25 } });
       onSwiped("left");
     } else {
+      reportDragX?.set(0);
       controls.start({ x: 0, rotate: 0, transition: { type: "spring", stiffness: 300, damping: 24 } });
     }
   }
@@ -48,6 +57,7 @@ export function SwipeCard({
       drag={active ? "x" : false}
       dragConstraints={{ left: 0, right: 0 }}
       dragElastic={1}
+      onDrag={handleDrag}
       onDragEnd={handleDragEnd}
       onTap={(event) => {
         if (!active) return;
