@@ -3,8 +3,9 @@ import { z } from "zod";
 
 // Accepts both a full URL and a bare domain (Railway shows domains without a
 // scheme, so "web-production-xxxx.up.railway.app" pasted as-is should work).
+// URLs can't contain whitespace or quotes, so those are typos - drop them.
 function normalizeUrl(value: string | undefined): string | undefined {
-  const trimmed = value?.trim().replace(/^["']+|["']+$/g, "");
+  const trimmed = value?.replace(/[\s"']+/g, "");
   if (!trimmed) return undefined;
   const withScheme = /^https?:\/\//.test(trimmed) ? trimmed : `https://${trimmed}`;
   try {
