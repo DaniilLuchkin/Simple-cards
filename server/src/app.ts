@@ -4,8 +4,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { env } from "./env.js";
-import { telegramAuth } from "./middleware/telegramAuth.js";
-import { cardsRouter } from "./api/routes/cards.js";
+import { telegramAuth } from "./auth.js";
+import { cardsRouter } from "./routes.js";
 
 export const app = express();
 
@@ -23,9 +23,9 @@ app.use("/uploads", express.static(env.UPLOADS_DIR));
 app.use("/api/cards", telegramAuth, cardsRouter);
 
 // Serves the built Mini App (web/dist) from the same process/origin when
-// present, so a single Railway service can host the API, the bot and the
-// frontend together. No-op for split server/web deployments where web/dist
-// was never built next to this service.
+// present, so a single service can host the API, the bot and the frontend
+// together. No-op for split server/web deployments where web/dist was never
+// built next to this service.
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const webDistPath = path.join(__dirname, "../../web/dist");
 

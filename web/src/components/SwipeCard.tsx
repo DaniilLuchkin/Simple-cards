@@ -1,7 +1,7 @@
 import { motion, useAnimation, useMotionValue, useTransform } from "framer-motion";
 import { useState } from "react";
 import type { Card } from "../lib/api";
-import { CardBack, CardFront } from "./CardView";
+import { FlipCard } from "./CardView";
 import { haptic } from "../lib/telegram";
 
 const SWIPE_THRESHOLD = 120;
@@ -16,7 +16,6 @@ export function SwipeCard({
   onSwiped: (direction: "left" | "right") => void;
 }) {
   const [flipped, setFlipped] = useState(false);
-  const [translationRevealed, setTranslationRevealed] = useState(false);
   const controls = useAnimation();
   const x = useMotionValue(0);
   const rotate = useTransform(x, [-300, 300], [-18, 18]);
@@ -38,11 +37,6 @@ export function SwipeCard({
     }
   }
 
-  function handleTap() {
-    if (!active) return;
-    setFlipped((f) => !f);
-  }
-
   return (
     <motion.div
       className="absolute inset-0 mx-auto h-full max-w-sm cursor-grab touch-none select-none active:cursor-grabbing"
@@ -52,28 +46,9 @@ export function SwipeCard({
       dragConstraints={{ left: 0, right: 0 }}
       dragElastic={1}
       onDragEnd={handleDragEnd}
-      onTap={handleTap}
+      onTap={() => active && setFlipped((f) => !f)}
     >
-      <motion.div
-        className="relative h-full w-full rounded-card shadow-soft"
-        style={{ transformStyle: "preserve-3d" }}
-        animate={{ rotateY: flipped ? 180 : 0 }}
-        transition={{ duration: 0.45 }}
-      >
-        <div className="absolute inset-0" style={{ backfaceVisibility: "hidden" }}>
-          <CardFront card={card} />
-        </div>
-        <div
-          className="absolute inset-0"
-          style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}
-        >
-          <CardBack
-            card={card}
-            translationRevealed={translationRevealed}
-            onRevealTranslation={() => setTranslationRevealed((r) => !r)}
-          />
-        </div>
-      </motion.div>
+      <FlipCard card={card} flipped={flipped} />
 
       <motion.div
         style={{ opacity: rememberOpacity }}

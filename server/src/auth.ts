@@ -1,9 +1,9 @@
 import crypto from "node:crypto";
 import type { NextFunction, Request, Response } from "express";
-import { env } from "../env.js";
-import { getOrCreateUser } from "../services/userService.js";
+import { env } from "./env.js";
+import { getOrCreateUser } from "./services.js";
 
-export type TelegramUser = {
+type TelegramUser = {
   id: number;
   username?: string;
   first_name?: string;

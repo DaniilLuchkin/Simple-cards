@@ -1,6 +1,40 @@
+import { motion } from "framer-motion";
+import { useState } from "react";
 import type { Card } from "../lib/api";
 
-export function CardFront({ card }: { card: Card }) {
+/**
+ * Two-sided card with a 3D flip. `flipped` is controlled by the parent
+ * (SwipeCard toggles it on tap, CardDetail on click); the blurred-translation
+ * reveal state lives here since both usages behave identically.
+ */
+export function FlipCard({ card, flipped }: { card: Card; flipped: boolean }) {
+  const [translationRevealed, setTranslationRevealed] = useState(false);
+
+  return (
+    <motion.div
+      className="relative h-full w-full rounded-card shadow-soft"
+      style={{ transformStyle: "preserve-3d" }}
+      animate={{ rotateY: flipped ? 180 : 0 }}
+      transition={{ duration: 0.45 }}
+    >
+      <div className="absolute inset-0" style={{ backfaceVisibility: "hidden" }}>
+        <CardFront card={card} />
+      </div>
+      <div
+        className="absolute inset-0"
+        style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}
+      >
+        <CardBack
+          card={card}
+          translationRevealed={translationRevealed}
+          onRevealTranslation={() => setTranslationRevealed((r) => !r)}
+        />
+      </div>
+    </motion.div>
+  );
+}
+
+function CardFront({ card }: { card: Card }) {
   return (
     <div className="flex h-full w-full flex-col gap-5 rounded-card bg-sky/40 p-7">
       {card.imageUrl && (
@@ -19,7 +53,7 @@ export function CardFront({ card }: { card: Card }) {
   );
 }
 
-export function CardBack({
+function CardBack({
   card,
   translationRevealed,
   onRevealTranslation,
@@ -38,6 +72,9 @@ export function CardBack({
             e.stopPropagation();
             onRevealTranslation();
           }}
+          // Keep the press from reaching the swipe gesture handlers - tapping
+          // the translation should never flip or drag the card.
+          onPointerDown={(e) => e.stopPropagation()}
           className="rounded-2xl bg-white/60 px-5 py-3 text-lg font-medium text-ink shadow-soft transition"
         >
           <span className={translationRevealed ? "" : "blur-sm select-none"}>{card.translation}</span>

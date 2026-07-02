@@ -1,4 +1,4 @@
-import { env } from "../env.js";
+import { env } from "./env.js";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 
@@ -10,36 +10,6 @@ type ChatMessage = {
   role: "system" | "user";
   content: string | ChatContentPart[];
 };
-
-async function chatCompletion(messages: ChatMessage[]): Promise<string> {
-  const res = await fetch(OPENROUTER_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${env.OPENROUTER_API_KEY}`,
-      "Content-Type": "application/json",
-      ...(env.OPENROUTER_SITE_URL ? { "HTTP-Referer": env.OPENROUTER_SITE_URL } : {}),
-      "X-Title": env.OPENROUTER_APP_NAME,
-    },
-    body: JSON.stringify({
-      model: env.OPENROUTER_MODEL,
-      messages,
-      response_format: { type: "json_object" },
-      temperature: 0.4,
-    }),
-  });
-
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`OpenRouter request failed: ${res.status} ${body}`);
-  }
-
-  const data = (await res.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-  };
-  const content = data.choices?.[0]?.message?.content;
-  if (!content) throw new Error("OpenRouter response had no content");
-  return content;
-}
 
 export type GeneratedCardFields = {
   word: string;
@@ -107,6 +77,36 @@ export async function regenerateCard(input: {
   ]);
 
   return parseGeneratedCard(content);
+}
+
+async function chatCompletion(messages: ChatMessage[]): Promise<string> {
+  const res = await fetch(OPENROUTER_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${env.OPENROUTER_API_KEY}`,
+      "Content-Type": "application/json",
+      "HTTP-Referer": env.MINI_APP_URL,
+      "X-Title": env.OPENROUTER_APP_NAME,
+    },
+    body: JSON.stringify({
+      model: env.OPENROUTER_MODEL,
+      messages,
+      response_format: { type: "json_object" },
+      temperature: 0.4,
+    }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`OpenRouter request failed: ${res.status} ${body}`);
+  }
+
+  const data = (await res.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+  };
+  const content = data.choices?.[0]?.message?.content;
+  if (!content) throw new Error("OpenRouter response had no content");
+  return content;
 }
 
 function parseGeneratedCard(raw: string): GeneratedCardFields {

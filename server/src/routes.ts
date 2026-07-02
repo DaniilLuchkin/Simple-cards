@@ -1,8 +1,8 @@
 import { Router } from "express";
 import { z } from "zod";
-import { prisma } from "../../db.js";
-import { sm2 } from "../../sm2.js";
-import { regenerateCardWithComment } from "../../services/cardService.js";
+import { prisma } from "./db.js";
+import { sm2 } from "./sm2.js";
+import { regenerateCardWithComment } from "./services.js";
 
 export const cardsRouter = Router();
 
@@ -15,7 +15,7 @@ cardsRouter.get("/due", async (req, res) => {
   res.json({ cards });
 });
 
-// Full library, for a "my cards" / management view.
+// Full library, for the "my cards" management view.
 cardsRouter.get("/", async (req, res) => {
   const cards = await prisma.card.findMany({
     where: { userId: req.dbUserId!, status: "ACTIVE" },
@@ -47,13 +47,7 @@ cardsRouter.post("/:id/review", async (req, res) => {
 
   const updated = await prisma.card.update({
     where: { id: card.id },
-    data: {
-      easeFactor: result.easeFactor,
-      interval: result.interval,
-      repetitions: result.repetitions,
-      dueAt: result.dueAt,
-      lastReviewedAt: new Date(),
-    },
+    data: { ...result, lastReviewedAt: new Date() },
   });
 
   res.json({ card: updated });

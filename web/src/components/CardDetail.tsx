@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { Card } from "../lib/api";
 import { api } from "../lib/api";
-import { CardBack, CardFront } from "./CardView";
+import { FlipCard } from "./CardView";
 import { RegenerateModal } from "./RegenerateModal";
 
 export function CardDetail({
@@ -16,7 +16,6 @@ export function CardDetail({
   onDeleted: (cardId: string) => void;
 }) {
   const [flipped, setFlipped] = useState(false);
-  const [translationRevealed, setTranslationRevealed] = useState(false);
   const [editing, setEditing] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -121,27 +120,7 @@ export function CardDetail({
             className="relative mx-auto aspect-[3/4] max-w-sm cursor-pointer"
             onClick={() => setFlipped((f) => !f)}
           >
-            <div
-              className="relative h-full w-full rounded-card shadow-soft transition-transform duration-500"
-              style={{
-                transformStyle: "preserve-3d",
-                transform: flipped ? "rotateY(180deg)" : "none",
-              }}
-            >
-              <div className="absolute inset-0" style={{ backfaceVisibility: "hidden" }}>
-                <CardFront card={card} />
-              </div>
-              <div
-                className="absolute inset-0"
-                style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}
-              >
-                <CardBack
-                  card={card}
-                  translationRevealed={translationRevealed}
-                  onRevealTranslation={() => setTranslationRevealed((r) => !r)}
-                />
-              </div>
-            </div>
+            <FlipCard card={card} flipped={flipped} />
           </div>
         )}
       </div>

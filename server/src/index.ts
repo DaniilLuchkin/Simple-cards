@@ -1,5 +1,5 @@
 import { app } from "./app.js";
-import { bot } from "./bot/bot.js";
+import { bot } from "./bot.js";
 import { env } from "./env.js";
 
 app.listen(env.PORT, () => {

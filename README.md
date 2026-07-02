@@ -7,11 +7,15 @@ Telegram Mini App для изучения английских слов. При�
 ## Структура
 
 - `server/` — Express API + Telegram-бот (grammy) + Prisma/PostgreSQL.
+  Плоский набор модулей в `src/`: `bot.ts` (все хендлеры бота), `routes.ts`
+  (REST API карточек), `auth.ts` (проверка Telegram initData), `llm.ts`
+  (OpenRouter), `services.ts` (работа с БД + генерация), `storage.ts`
+  (картинки на диске), `sm2.ts` (интервальные повторения), `env.ts` (конфиг).
 - `web/` — Telegram Mini App (React + Vite + Tailwind).
 
-В проде `server` отдаёт собранный `web/dist` как статику из того же процесса
-(см. `server/src/app.ts`) — это один деплой-юнит, см. «Деплой на Railway».
-В разработке удобнее гонять их раздельно (hot reload у Vite).
+В проде `server` может отдавать собранный `web/dist` как статику из того же
+процесса (см. `server/src/app.ts`) — тогда это один деплой-юнит. В разработке
+удобнее гонять их раздельно (hot reload у Vite).
 
 ## Как это работает
 
@@ -84,8 +88,8 @@ OpenRouter: ключ на https://openrouter.ai/keys, модель задаёт�
      (сам прогонит `prisma migrate deploy` перед запуском)
    - Settings → Networking → **Generate Domain**. Как только домен появится,
      Railway положит его в переменную `RAILWAY_PUBLIC_DOMAIN`, а сервер сам
-     возьмёт её для `MINI_APP_URL`/`CORS_ORIGIN`/`OPENROUTER_SITE_URL` —
-     вручную эти три задавать не нужно (см. `server/src/env.ts`).
+     возьмёт её для `MINI_APP_URL` и `CORS_ORIGIN` — вручную их задавать
+     не нужно (см. `server/src/env.ts`).
    - Держите **1 instance/replica** — бот работает через long polling, два
      одновременных процесса будут конфликтовать за апдейты.
 
@@ -105,16 +109,16 @@ OpenRouter: ключ на https://openrouter.ai/keys, модель задаёт�
 
 ### Если всё же нужны два сервиса
 
-Например, если захочется отдавать фронтенд через CDN отдельно. Тогда:
+Например, если Railway сам разбил монорепо на два сервиса, или захочется
+отдавать фронтенд через CDN отдельно. Тогда:
 - `server`: тот же Build/Start, но без шага сборки `web`; задайте `MINI_APP_URL`
-  и `CORS_ORIGIN` вручную (домен сервиса `web`).
+  вручную = домен сервиса `web` (CORS настроится сам — он по умолчанию равен
+  `MINI_APP_URL`; картинки тоже — они по умолчанию отдаются с собственного
+  Railway-домена сервера).
 - `web`: Build — `pnpm --filter @simple-cards/web build`, Start —
   `pnpm --filter @simple-cards/web start` (раздаёт `dist/` через `serve`).
   Переменная `VITE_API_URL` = домен сервиса `server` (build-time, нужен redeploy
   при смене).
-- Картинки тогда отдаёт `server` со своего домена — `imageUrl` уже содержит
-  правильный абсолютный URL (берётся из `MINI_APP_URL`/`PUBLIC_ORIGIN`), так
-  что `web` ничего отдельно настраивать не нужно.
 
 ## Алгоритм повторения
 
