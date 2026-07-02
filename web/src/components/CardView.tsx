@@ -71,13 +71,15 @@ function CardBack({
         <p className="text-lg leading-relaxed text-ink">{card.explanation}</p>
         <button
           type="button"
+          // Tapping the translation must not flip the card. stopPropagation
+          // handles CardDetail's React onClick; SwipeCard's framer-motion tap
+          // listens on raw pointer events that fire before React's, so it
+          // checks for this marker instead.
+          data-no-flip
           onClick={(e) => {
             e.stopPropagation();
             onRevealTranslation();
           }}
-          // Keep the press from reaching the swipe gesture handlers - tapping
-          // the translation should never flip or drag the card.
-          onPointerDown={(e) => e.stopPropagation()}
           className="rounded-2xl bg-white/60 px-5 py-3 text-lg font-medium text-ink shadow-soft transition"
         >
           <span className={translationRevealed ? "" : "blur-sm select-none"}>{card.translation}</span>

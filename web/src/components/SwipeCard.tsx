@@ -46,7 +46,12 @@ export function SwipeCard({
       dragConstraints={{ left: 0, right: 0 }}
       dragElastic={1}
       onDragEnd={handleDragEnd}
-      onTap={() => active && setFlipped((f) => !f)}
+      onTap={(event) => {
+        if (!active) return;
+        // Taps on the translation-reveal button must not flip the card.
+        if ((event.target as HTMLElement | null)?.closest("[data-no-flip]")) return;
+        setFlipped((f) => !f);
+      }}
     >
       <FlipCard card={card} flipped={flipped} />
 
