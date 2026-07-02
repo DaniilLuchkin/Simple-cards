@@ -1,10 +1,17 @@
 import { Router } from "express";
 import { z } from "zod";
+import type { Card } from "@prisma/client";
 import { prisma } from "./db.js";
 import { sm2 } from "./sm2.js";
 import { regenerateCardWithComment } from "./services.js";
+import { absoluteImageUrl } from "./storage.js";
 
 export const cardsRouter = Router();
+
+// The DB stores a relative image path; clients get a full URL.
+function toApiCard(card: Card) {
+  return { ...card, imageUrl: absoluteImageUrl(card.imageUrl) };
+}
 
 // All cards due for review right now, oldest due date first.
 cardsRouter.get("/due", async (req, res) => {
@@ -12,7 +19,7 @@ cardsRouter.get("/due", async (req, res) => {
     where: { userId: req.dbUserId!, status: "ACTIVE", dueAt: { lte: new Date() } },
     orderBy: { dueAt: "asc" },
   });
-  res.json({ cards });
+  res.json({ cards: cards.map(toApiCard) });
 });
 
 // Full library, for the "my cards" management view.
@@ -21,7 +28,7 @@ cardsRouter.get("/", async (req, res) => {
     where: { userId: req.dbUserId!, status: "ACTIVE" },
     orderBy: { createdAt: "desc" },
   });
-  res.json({ cards });
+  res.json({ cards: cards.map(toApiCard) });
 });
 
 const reviewSchema = z.object({
@@ -50,7 +57,7 @@ cardsRouter.post("/:id/review", async (req, res) => {
     data: { ...result, lastReviewedAt: new Date() },
   });
 
-  res.json({ card: updated });
+  res.json({ card: toApiCard(updated) });
 });
 
 const regenerateSchema = z.object({
@@ -70,7 +77,7 @@ cardsRouter.post("/:id/regenerate", async (req, res) => {
       userId: req.dbUserId!,
       comment: parsed.data.comment,
     });
-    res.json({ card });
+    res.json({ card: toApiCard(card) });
   } catch (err) {
     console.error("Regenerate failed", err);
     res.status(500).json({ error: "Failed to regenerate card" });
@@ -107,7 +114,7 @@ cardsRouter.patch("/:id", async (req, res) => {
     data: parsed.data,
   });
 
-  res.json({ card: updated });
+  res.json({ card: toApiCard(updated) });
 });
 
 cardsRouter.delete("/:id", async (req, res) => {

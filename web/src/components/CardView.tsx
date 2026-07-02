@@ -42,6 +42,9 @@ function CardFront({ card }: { card: Card }) {
           src={card.imageUrl}
           alt=""
           className="h-40 w-full rounded-2xl object-cover shadow-soft"
+          // If the file is gone (e.g. deploy without a persistent volume),
+          // hide the slot instead of showing a broken-image icon.
+          onError={(e) => (e.currentTarget.style.display = "none")}
         />
       )}
       <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">

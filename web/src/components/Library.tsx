@@ -32,7 +32,12 @@ export function Library({
           className="flex items-center gap-3 rounded-2xl bg-mint/30 p-4 text-left shadow-soft"
         >
           {card.imageUrl && (
-            <img src={card.imageUrl} alt="" className="h-14 w-14 shrink-0 rounded-xl object-cover" />
+            <img
+              src={card.imageUrl}
+              alt=""
+              className="h-14 w-14 shrink-0 rounded-xl object-cover"
+              onError={(e) => (e.currentTarget.style.display = "none")}
+            />
           )}
           <div className="min-w-0 flex-1">
             <p className="truncate text-base font-semibold text-ink">{card.word}</p>

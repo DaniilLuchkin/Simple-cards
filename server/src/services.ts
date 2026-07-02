@@ -1,5 +1,6 @@
 import { prisma } from "./db.js";
 import { generateCard, generateCardFromImage, regenerateCard } from "./llm.js";
+import { absoluteImageUrl } from "./storage.js";
 
 export async function getOrCreateUser(input: {
   telegramId: bigint;
@@ -21,26 +22,27 @@ export async function createCard(input: {
   userId: string;
   word: string;
   userExample?: string;
-  imageUrl?: string;
+  imagePath?: string;
 }) {
   const fields = await generateCard({
     word: input.word,
     userExample: input.userExample,
-    imageUrl: input.imageUrl,
+    // The LLM fetches the image itself, so it needs the full public URL.
+    imageUrl: absoluteImageUrl(input.imagePath ?? null) ?? undefined,
   });
 
   return prisma.card.create({
-    data: { userId: input.userId, ...fields, imageUrl: input.imageUrl },
+    data: { userId: input.userId, ...fields, imageUrl: input.imagePath },
   });
 }
 
 // Returns null when the photo isn't obvious enough to name confidently.
-export async function createCardFromImage(input: { userId: string; imageUrl: string }) {
-  const fields = await generateCardFromImage(input.imageUrl);
+export async function createCardFromImage(input: { userId: string; imagePath: string }) {
+  const fields = await generateCardFromImage(absoluteImageUrl(input.imagePath)!);
   if (!fields) return null;
 
   return prisma.card.create({
-    data: { userId: input.userId, ...fields, imageUrl: input.imageUrl },
+    data: { userId: input.userId, ...fields, imageUrl: input.imagePath },
   });
 }
 

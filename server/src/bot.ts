@@ -59,13 +59,13 @@ bot.command("app", (ctx) =>
 bot.on("message:photo", async (ctx) => {
   const statusMsg = await ctx.reply("Загружаю картинку…");
 
-  let imageUrl: string;
+  let imagePath: string;
   try {
     const largest = ctx.message.photo[ctx.message.photo.length - 1];
     const file = await ctx.api.getFile(largest.file_id);
     const res = await fetch(`https://api.telegram.org/file/bot${env.TELEGRAM_BOT_TOKEN}/${file.file_path}`);
     if (!res.ok) throw new Error(`Photo download failed: ${res.status}`);
-    imageUrl = await saveImage(
+    imagePath = await saveImage(
       Buffer.from(await res.arrayBuffer()),
       res.headers.get("content-type") ?? "image/jpeg"
     );
@@ -82,7 +82,7 @@ bot.on("message:photo", async (ctx) => {
   const caption = ctx.message.caption?.trim();
   if (caption) {
     await ctx.api.editMessageText(ctx.chat.id, statusMsg.message_id, "Генерирую карточку…");
-    await generateCardAndReply(ctx, statusMsg.message_id, { ...parseWordInput(caption), imageUrl });
+    await generateCardAndReply(ctx, statusMsg.message_id, { ...parseWordInput(caption), imagePath });
     return;
   }
 
@@ -91,7 +91,7 @@ bot.on("message:photo", async (ctx) => {
   await ctx.api.editMessageText(ctx.chat.id, statusMsg.message_id, "Смотрю, что на фото…");
   try {
     const user = await userFromCtx(ctx);
-    const card = await createCardFromImage({ userId: user.id, imageUrl });
+    const card = await createCardFromImage({ userId: user.id, imagePath });
     if (card) {
       await ctx.api.editMessageText(
         ctx.chat.id,
@@ -105,7 +105,7 @@ bot.on("message:photo", async (ctx) => {
     console.error("Photo auto-recognition failed", err);
   }
 
-  pendingImageByChat.set(ctx.chat.id, imageUrl);
+  pendingImageByChat.set(ctx.chat.id, imagePath);
   await ctx.api.editMessageText(
     ctx.chat.id,
     statusMsg.message_id,
@@ -125,8 +125,8 @@ bot.on("message:text", async (ctx) => {
   }
 
   const statusMsg = await ctx.reply("Генерирую карточку…");
-  const imageUrl = pendingImageByChat.get(ctx.chat.id);
-  const card = await generateCardAndReply(ctx, statusMsg.message_id, { word, example, imageUrl });
+  const imagePath = pendingImageByChat.get(ctx.chat.id);
+  const card = await generateCardAndReply(ctx, statusMsg.message_id, { word, example, imagePath });
   // Keep the pending image on failure so the user can just retry the word.
   if (card) pendingImageByChat.delete(ctx.chat.id);
 });
@@ -147,7 +147,7 @@ function userFromCtx(ctx: Context) {
 async function generateCardAndReply(
   ctx: Context,
   statusMsgId: number,
-  input: { word: string; example?: string; imageUrl?: string }
+  input: { word: string; example?: string; imagePath?: string }
 ) {
   const chatId = ctx.chat!.id;
 
@@ -158,7 +158,7 @@ async function generateCardAndReply(
       userId: user.id,
       word: input.word,
       userExample: input.example,
-      imageUrl: input.imageUrl,
+      imagePath: input.imagePath,
     });
 
     await ctx.api.editMessageText(chatId, statusMsgId, `Готово! Карточка для «${card.word}» добавлена.`);
