@@ -5,7 +5,10 @@ import type { Card } from "../lib/api";
 import { FlipCard } from "./CardView";
 import { haptic } from "../lib/telegram";
 
-const SWIPE_THRESHOLD = 120;
+// Commit a swipe on a short drag OR a quick flick, so the user doesn't have to
+// drag all the way across the screen.
+const SWIPE_DISTANCE = 60;
+const SWIPE_VELOCITY = 400;
 
 export function SwipeCard({
   card,
@@ -31,14 +34,21 @@ export function SwipeCard({
     if (active) reportDragX?.set(info.offset.x);
   }
 
-  async function handleDragEnd(_: unknown, info: { offset: { x: number } }) {
+  async function handleDragEnd(
+    _: unknown,
+    info: { offset: { x: number }; velocity: { x: number } }
+  ) {
     if (!active) return;
-    if (info.offset.x > SWIPE_THRESHOLD) {
+    const { offset, velocity } = info;
+    const goRight = offset.x > SWIPE_DISTANCE || velocity.x > SWIPE_VELOCITY;
+    const goLeft = offset.x < -SWIPE_DISTANCE || velocity.x < -SWIPE_VELOCITY;
+
+    if (goRight && offset.x >= 0) {
       haptic("medium");
       reportDragX?.set(0);
       await controls.start({ x: 600, rotate: 20, opacity: 0, transition: { duration: 0.25 } });
       onSwiped("right");
-    } else if (info.offset.x < -SWIPE_THRESHOLD) {
+    } else if (goLeft && offset.x <= 0) {
       haptic("medium");
       reportDragX?.set(0);
       await controls.start({ x: -600, rotate: -20, opacity: 0, transition: { duration: 0.25 } });

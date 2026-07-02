@@ -35,8 +35,8 @@ export function CardStack({
   // Shared with the active card so the feedback overlays below can react to
   // the drag in real time.
   const dragX = useMotionValue(0);
-  const rememberOpacity = useTransform(dragX, [30, 140], [0, 1]);
-  const forgotOpacity = useTransform(dragX, [-140, -30], [1, 0]);
+  const rememberOpacity = useTransform(dragX, [15, 70], [0, 1]);
+  const forgotOpacity = useTransform(dragX, [-70, -15], [1, 0]);
 
   function handleSwiped(card: Card, direction: "left" | "right") {
     dragX.set(0);
