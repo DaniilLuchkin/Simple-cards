@@ -10,11 +10,7 @@ import { cardsRouter } from "./routes.js";
 export const app = express();
 
 app.use(express.json());
-app.use(
-  cors({
-    origin: env.CORS_ORIGIN.split(",").map((o) => o.trim()),
-  })
-);
+app.use(cors({ origin: env.CORS_ORIGINS }));
 
 app.get("/health", (_req, res) => res.json({ ok: true }));
 

@@ -18,5 +18,5 @@ export async function saveImage(buffer: Buffer, contentType: string): Promise<st
   const dir = path.join(env.UPLOADS_DIR, "cards");
   await mkdir(dir, { recursive: true });
   await writeFile(path.join(dir, fileName), buffer);
-  return `${env.PUBLIC_ORIGIN.replace(/\/$/, "")}/uploads/cards/${fileName}`;
+  return `${env.PUBLIC_ORIGIN}/uploads/cards/${fileName}`;
 }
