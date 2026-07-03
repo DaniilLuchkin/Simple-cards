@@ -5,6 +5,7 @@ type TelegramWebApp = {
   expand: () => void;
   setHeaderColor: (color: string) => void;
   setBackgroundColor: (color: string) => void;
+  disableVerticalSwipes?: () => void;
   HapticFeedback?: {
     impactOccurred: (style: "light" | "medium" | "heavy" | "rigid" | "soft") => void;
     notificationOccurred: (type: "error" | "success" | "warning") => void;
@@ -28,6 +29,9 @@ export function initTelegram() {
   webApp.expand();
   webApp.setBackgroundColor("#ffffff");
   webApp.setHeaderColor("#ffffff");
+  // Only the drag handle at the very top should minimize the app; swiping
+  // content (cards, lists) must not close it.
+  webApp.disableVerticalSwipes?.();
 }
 
 export function getInitData(): string {

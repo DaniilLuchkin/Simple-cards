@@ -14,10 +14,32 @@ model User {
   firstName  String?
   createdAt  DateTime @default(now())
 
+  // Language codes (see web/src/lib/prefs LANGUAGES). learningLanguage is the
+  // vocabulary being studied; translationLanguage is what cards translate into.
+  learningLanguage    String @default("en")
+  translationLanguage String @default("ru")
+  // Target number of reviews per day for the streak/heatmap.
+  dailyGoal Int @default(10)
+
   // When the daily word-of-the-day message was last sent to this user.
   lastWordOfDayAt DateTime?
 
-  cards Card[]
+  cards      Card[]
+  reviewDays ReviewDay[]
+}
+
+// One row per user per day they reviewed cards. `count` drives the streak
+// heatmap; a day counts toward the streak when count >= the user's dailyGoal.
+model ReviewDay {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Calendar day at UTC midnight.
+  day   DateTime @db.Date
+  count Int      @default(0)
+
+  @@unique([userId, day])
 }
 
 enum CardStatus {

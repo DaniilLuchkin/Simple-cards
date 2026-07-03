@@ -1,4 +1,5 @@
 import { env } from "./env.js";
+import type { Languages } from "./languages.js";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 
@@ -18,21 +19,24 @@ export type GeneratedCardFields = {
   translation: string;
 };
 
-const SYSTEM_PROMPT = `You are a card-writing assistant for "Simple Cards", a Telegram mini app for learning English vocabulary.
+function cardSystemPrompt({ learning, translation }: Languages): string {
+  return `You are a card-writing assistant for "Simple Cards", a Telegram mini app for learning ${learning} vocabulary.
 Given a word or phrase (and optionally a user-provided example sentence and/or an image), produce a flashcard.
 
 Rules:
-- "word": the canonical English word/phrase, cleaned up (fix obvious typos, keep user's intended word).
-- "example": one natural example sentence using the word. If the user provided their own example, reuse it (lightly fixed for grammar) instead of writing a new one.
-- "explanation": an explanation of the word's meaning written in SIMPLE English (B1 level, short sentences, no rare words), as if explaining to a learner. Do not just repeat the word.
-- "translation": an accurate Russian translation of the word/phrase (a short translation, not a sentence).
+- "word": the canonical ${learning} word/phrase, cleaned up (fix obvious typos, keep user's intended word). If the user typed it in another language, translate it to ${learning}.
+- "example": one natural example sentence in ${learning} using the word. If the user provided their own example, reuse it (lightly fixed for grammar) instead of writing a new one.
+- "explanation": an explanation of the word's meaning written in SIMPLE ${learning} (beginner level, short sentences, no rare words), as if explaining to a learner. Do not just repeat the word.
+- "translation": an accurate ${translation} translation of the word/phrase (a short translation, not a sentence).
 
 Respond ONLY with a JSON object: {"word": string, "example": string, "explanation": string, "translation": string}`;
+}
 
 export async function generateCard(input: {
   word: string;
   userExample?: string;
   imageUrl?: string;
+  languages: Languages;
 }): Promise<GeneratedCardFields> {
   const userParts: ChatContentPart[] = [
     {
@@ -51,30 +55,35 @@ export async function generateCard(input: {
   }
 
   const content = await chatCompletion([
-    { role: "system", content: SYSTEM_PROMPT },
+    { role: "system", content: cardSystemPrompt(input.languages) },
     { role: "user", content: userParts },
   ]);
 
   return parseGeneratedCard(content);
 }
 
-const IMAGE_SYSTEM_PROMPT = `You are a card-writing assistant for "Simple Cards", a Telegram mini app for learning English vocabulary.
+function imageSystemPrompt({ learning, translation }: Languages): string {
+  return `You are a card-writing assistant for "Simple Cards", a Telegram mini app for learning ${learning} vocabulary.
 The user sent a photo without any text. Identify the single most prominent object, action or concept in the photo.
 
-- If you can identify it confidently (a clear everyday object like headphones, a cup, a dog), produce a flashcard for its common English name following these rules:
-  - "word": the common English word for what's in the photo.
-  - "example": one natural example sentence using the word.
-  - "explanation": the word's meaning in SIMPLE English (B1 level, short sentences, no rare words). Do not just repeat the word.
-  - "translation": an accurate Russian translation of the word (short, not a sentence).
+- If you can identify it confidently (a clear everyday object like headphones, a cup, a dog), produce a flashcard for its common ${learning} name following these rules:
+  - "word": the common ${learning} word for what's in the photo.
+  - "example": one natural example sentence in ${learning} using the word.
+  - "explanation": the word's meaning in SIMPLE ${learning} (beginner level, short sentences, no rare words). Do not just repeat the word.
+  - "translation": an accurate ${translation} translation of the word (short, not a sentence).
   Respond: {"recognized": true, "word": string, "example": string, "explanation": string, "translation": string}
 - If the photo is ambiguous, abstract, or could reasonably be named many different ways, respond: {"recognized": false}
 
 Respond ONLY with the JSON object.`;
+}
 
 // Returns null when the model can't confidently name what's in the photo.
-export async function generateCardFromImage(imageUrl: string): Promise<GeneratedCardFields | null> {
+export async function generateCardFromImage(
+  imageUrl: string,
+  languages: Languages
+): Promise<GeneratedCardFields | null> {
   const content = await chatCompletion([
-    { role: "system", content: IMAGE_SYSTEM_PROMPT },
+    { role: "system", content: imageSystemPrompt(languages) },
     {
       role: "user",
       content: [
@@ -94,24 +103,29 @@ export async function generateCardFromImage(imageUrl: string): Promise<Generated
   return parseGeneratedCard(content);
 }
 
-const WORD_OF_DAY_SYSTEM_PROMPT = `You are the "word of the day" picker for "Simple Cards", a Telegram app for Russian speakers learning English vocabulary.
+function wordOfDayPrompt({ learning, translation }: Languages): string {
+  return `You are the "word of the day" picker for "Simple Cards", a Telegram app for people learning ${learning} vocabulary.
 
-Pick ONE genuinely useful English word or common expression (B1-C1 level): something a learner would actually use in conversation, work or travel. Not too basic (no "cat", "house"), not obscure academic jargon. Vary the part of speech and topic from day to day.
+Pick ONE genuinely useful ${learning} word or common expression (intermediate level): something a learner would actually use in conversation, work or travel. Not too basic, not obscure academic jargon. Vary the part of speech and topic from day to day.
 
 You are given a list of words the user already has - do NOT pick any of them or their close forms.
 
 For the picked word produce flashcard fields following these rules:
-- "word": the word/expression itself.
-- "example": one natural example sentence using it.
-- "explanation": its meaning in SIMPLE English (B1 level, short sentences, no rare words). Do not just repeat the word.
-- "translation": an accurate Russian translation (short, not a sentence).
+- "word": the ${learning} word/expression itself.
+- "example": one natural example sentence in ${learning} using it.
+- "explanation": its meaning in SIMPLE ${learning} (beginner level, short sentences, no rare words). Do not just repeat the word.
+- "translation": an accurate ${translation} translation (short, not a sentence).
 
 Respond ONLY with a JSON object: {"word": string, "example": string, "explanation": string, "translation": string}`;
+}
 
-export async function generateWordOfDay(existingWords: string[]): Promise<GeneratedCardFields> {
+export async function generateWordOfDay(
+  existingWords: string[],
+  languages: Languages
+): Promise<GeneratedCardFields> {
   const content = await chatCompletion(
     [
-      { role: "system", content: WORD_OF_DAY_SYSTEM_PROMPT },
+      { role: "system", content: wordOfDayPrompt(languages) },
       {
         role: "user",
         content: existingWords.length
@@ -129,9 +143,10 @@ export async function regenerateCard(input: {
   word: string;
   previous: GeneratedCardFields;
   userComment: string;
+  languages: Languages;
 }): Promise<GeneratedCardFields> {
   const content = await chatCompletion([
-    { role: "system", content: SYSTEM_PROMPT },
+    { role: "system", content: cardSystemPrompt(input.languages) },
     {
       role: "user",
       content: [

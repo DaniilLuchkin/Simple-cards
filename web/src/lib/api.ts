@@ -33,6 +33,20 @@ export type Sm2Snapshot = Pick<
   "easeFactor" | "interval" | "repetitions" | "dueAt" | "lastReviewedAt"
 >;
 
+export type Profile = {
+  learningLanguage: string;
+  translationLanguage: string;
+  dailyGoal: number;
+  todayCount: number;
+  streak: number;
+  // { "2026-07-03": 12, ... }
+  activity: Record<string, number>;
+};
+
+export type ProfileUpdate = Partial<
+  Pick<Profile, "learningLanguage" | "translationLanguage" | "dailyGoal">
+>;
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     ...init,
@@ -75,5 +89,11 @@ export const api = {
     request<{ card: Card }>(`/api/cards/${id}`, {
       method: "PATCH",
       body: JSON.stringify(fields),
+    }),
+  getProfile: () => request<{ profile: Profile }>("/api/me"),
+  updateProfile: (update: ProfileUpdate) =>
+    request<{ profile: Profile }>("/api/me", {
+      method: "PATCH",
+      body: JSON.stringify(update),
     }),
 };

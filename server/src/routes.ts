@@ -3,10 +3,36 @@ import { z } from "zod";
 import type { Card } from "@prisma/client";
 import { prisma } from "./db.js";
 import { sm2 } from "./sm2.js";
-import { regenerateCardWithComment } from "./services.js";
+import { getProfile, recordReview, regenerateCardWithComment, updateProfile } from "./services.js";
+import { LANGUAGE_NAMES } from "./languages.js";
 import { absoluteImageUrl } from "./storage.js";
 
 export const cardsRouter = Router();
+export const meRouter = Router();
+
+const LANGUAGE_CODES = Object.keys(LANGUAGE_NAMES) as [string, ...string[]];
+
+meRouter.get("/", async (req, res) => {
+  res.json({ profile: await getProfile(req.dbUserId!) });
+});
+
+const profileSchema = z
+  .object({
+    learningLanguage: z.enum(LANGUAGE_CODES),
+    translationLanguage: z.enum(LANGUAGE_CODES),
+    dailyGoal: z.number().int().min(1).max(500),
+  })
+  .partial()
+  .refine((d) => Object.keys(d).length > 0, { message: "No fields to update" });
+
+meRouter.patch("/", async (req, res) => {
+  const parsed = profileSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten() });
+    return;
+  }
+  res.json({ profile: await updateProfile(req.dbUserId!, parsed.data) });
+});
 
 // The DB stores a relative image path; clients get a full URL.
 function toApiCard(card: Card) {
@@ -56,6 +82,8 @@ cardsRouter.post("/:id/review", async (req, res) => {
     where: { id: card.id },
     data: { ...result, lastReviewedAt: new Date() },
   });
+
+  await recordReview(req.dbUserId!);
 
   res.json({ card: toApiCard(updated) });
 });

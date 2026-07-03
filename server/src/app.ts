@@ -5,7 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { env } from "./env.js";
 import { telegramAuth } from "./auth.js";
-import { cardsRouter } from "./routes.js";
+import { cardsRouter, meRouter } from "./routes.js";
 
 export const app = express();
 
@@ -17,6 +17,7 @@ app.get("/health", (_req, res) => res.json({ ok: true }));
 app.use("/uploads", express.static(env.UPLOADS_DIR));
 
 app.use("/api/cards", telegramAuth, cardsRouter);
+app.use("/api/me", telegramAuth, meRouter);
 
 // Serves the built Mini App (web/dist) from the same process/origin when
 // present, so a single service can host the API, the bot and the frontend

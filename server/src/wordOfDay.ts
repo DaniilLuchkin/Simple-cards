@@ -4,6 +4,7 @@ import { prisma } from "./db.js";
 import { env } from "./env.js";
 import { generateWordOfDay } from "./llm.js";
 import type { GeneratedCardFields } from "./llm.js";
+import { languageNames } from "./languages.js";
 import { listUserWords } from "./services.js";
 
 const CHECK_INTERVAL_MS = 10 * 60 * 1000;
@@ -43,9 +44,12 @@ export function parseWordOfDayMessage(text: string): GeneratedCardFields | null 
   return { word, explanation, example, translation };
 }
 
-export async function sendWordOfDay(bot: Bot, user: { id: string; telegramId: bigint }) {
+export async function sendWordOfDay(
+  bot: Bot,
+  user: { id: string; telegramId: bigint; learningLanguage: string; translationLanguage: string }
+) {
   const existingWords = await listUserWords(user.id);
-  const fields = await generateWordOfDay(existingWords);
+  const fields = await generateWordOfDay(existingWords, languageNames(user));
 
   await bot.api.sendMessage(Number(user.telegramId), formatMessage(fields), {
     parse_mode: "HTML",
@@ -67,7 +71,7 @@ async function tick(bot: Bot) {
     where: {
       OR: [{ lastWordOfDayAt: null }, { lastWordOfDayAt: { lt: startOfTodayUtc } }],
     },
-    select: { id: true, telegramId: true },
+    select: { id: true, telegramId: true, learningLanguage: true, translationLanguage: true },
   });
 
   for (const user of users) {
