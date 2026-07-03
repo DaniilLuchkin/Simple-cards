@@ -30,7 +30,7 @@ function sm2Snapshot(card: Card): Sm2Snapshot {
 type UndoInfo = { card: Card; snapshot: Sm2Snapshot; practice: boolean };
 
 export function App() {
-  const { theme, toggleTheme, t } = usePrefs();
+  const { t, uiLang, setUiLang } = usePrefs();
   const [tab, setTab] = useState<Tab>("review");
   const [dueCards, setDueCards] = useState<Card[] | null>(null);
   const [allCards, setAllCards] = useState<Card[] | null>(null);
@@ -41,6 +41,21 @@ export function App() {
 
   useEffect(() => {
     api.getDueCards().then((res) => setDueCards(res.cards)).catch((err) => setError(String(err)));
+
+    // The bot's /language command sets interfaceLanguage server-side - it's
+    // the source of truth when present, overriding whatever this device
+    // happened to have locally (e.g. first-ever open on a new device).
+    api
+      .getProfile()
+      .then((res) => {
+        setProfile(res.profile);
+        if (res.profile.interfaceLanguage && res.profile.interfaceLanguage !== uiLang) {
+          setUiLang(res.profile.interfaceLanguage);
+        }
+      })
+      .catch((err) => setError(String(err)));
+    // Intentionally run once on mount only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -121,17 +136,6 @@ export function App() {
 
   return (
     <div className="mx-auto flex h-screen max-w-md flex-col px-4 pt-[max(env(safe-area-inset-top),0.5rem)]">
-      <header className="flex items-center justify-end py-1">
-        <button
-          type="button"
-          onClick={toggleTheme}
-          aria-label="Toggle theme"
-          className="flex h-8 w-8 items-center justify-center rounded-full bg-sky/40 text-sm dark:bg-sky/20"
-        >
-          {theme === "dark" ? "☀️" : "🌙"}
-        </button>
-      </header>
-
       <TabBar tab={tab} onChange={setTab} />
 
       <main className="min-h-0 flex-1 pb-[max(env(safe-area-inset-bottom),0.5rem)]">

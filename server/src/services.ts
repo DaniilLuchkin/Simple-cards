@@ -122,6 +122,8 @@ export async function recordReview(userId: string) {
 export type Profile = {
   learningLanguage: string;
   translationLanguage: string;
+  // null = no explicit choice yet; client falls back to its own default.
+  interfaceLanguage: string | null;
   dailyGoal: number;
   todayCount: number;
   streak: number;
@@ -136,7 +138,12 @@ function dayKey(day: Date): string {
 export async function getProfile(userId: string): Promise<Profile> {
   const user = await prisma.user.findUniqueOrThrow({
     where: { id: userId },
-    select: { learningLanguage: true, translationLanguage: true, dailyGoal: true },
+    select: {
+      learningLanguage: true,
+      translationLanguage: true,
+      interfaceLanguage: true,
+      dailyGoal: true,
+    },
   });
 
   const since = utcDay();
@@ -165,6 +172,7 @@ export async function getProfile(userId: string): Promise<Profile> {
   return {
     learningLanguage: user.learningLanguage,
     translationLanguage: user.translationLanguage,
+    interfaceLanguage: user.interfaceLanguage,
     dailyGoal: user.dailyGoal,
     todayCount,
     streak,
@@ -174,7 +182,12 @@ export async function getProfile(userId: string): Promise<Profile> {
 
 export async function updateProfile(
   userId: string,
-  data: { learningLanguage?: string; translationLanguage?: string; dailyGoal?: number }
+  data: {
+    learningLanguage?: string;
+    translationLanguage?: string;
+    interfaceLanguage?: string;
+    dailyGoal?: number;
+  }
 ) {
   await prisma.user.update({ where: { id: userId }, data });
   return getProfile(userId);

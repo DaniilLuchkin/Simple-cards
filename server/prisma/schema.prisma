@@ -14,10 +14,12 @@ model User {
   firstName  String?
   createdAt  DateTime @default(now())
 
-  // Language codes (see web/src/lib/prefs LANGUAGES). learningLanguage is the
-  // vocabulary being studied; translationLanguage is what cards translate into.
-  learningLanguage    String @default("en")
-  translationLanguage String @default("ru")
+  // Language codes (see web/src/lib/i18n LANGUAGES). learningLanguage is the
+  // vocabulary being studied; translationLanguage is what cards translate into;
+  // interfaceLanguage is the Mini App UI language (null = let the client pick).
+  learningLanguage    String  @default("en")
+  translationLanguage String  @default("ru")
+  interfaceLanguage   String?
   // Target number of reviews per day for the streak/heatmap.
   dailyGoal Int @default(10)
 

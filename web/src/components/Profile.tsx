@@ -72,7 +72,14 @@ export function Profile({
 
       {/* Languages */}
       <div className="flex flex-col gap-2">
-        <LanguageSelect label={t("interfaceLanguage")} value={uiLang} onChange={setUiLang} />
+        <LanguageSelect
+          label={t("interfaceLanguage")}
+          value={uiLang}
+          onChange={(code) => {
+            setUiLang(code);
+            onUpdate({ interfaceLanguage: code });
+          }}
+        />
         <LanguageSelect
           label={t("iLearn")}
           value={profile.learningLanguage}

@@ -36,6 +36,9 @@ export type Sm2Snapshot = Pick<
 export type Profile = {
   learningLanguage: string;
   translationLanguage: string;
+  // null = not chosen yet (e.g. never touched /language in the bot); the
+  // client's own local preference wins in that case.
+  interfaceLanguage: string | null;
   dailyGoal: number;
   todayCount: number;
   streak: number;
@@ -44,7 +47,7 @@ export type Profile = {
 };
 
 export type ProfileUpdate = Partial<
-  Pick<Profile, "learningLanguage" | "translationLanguage" | "dailyGoal">
+  Pick<Profile, "learningLanguage" | "translationLanguage" | "interfaceLanguage" | "dailyGoal">
 >;
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {

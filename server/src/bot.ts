@@ -1,7 +1,14 @@
 import { Bot, InlineKeyboard } from "grammy";
 import type { Context } from "grammy";
 import { env } from "./env.js";
-import { createCard, createCardFromFields, createCardFromImage, getOrCreateUser } from "./services.js";
+import {
+  createCard,
+  createCardFromFields,
+  createCardFromImage,
+  getOrCreateUser,
+  updateProfile,
+} from "./services.js";
+import { LANGUAGE_NATIVE_NAMES } from "./languages.js";
 import { saveImage } from "./storage.js";
 import { parseWordInput } from "./parseInput.js";
 import { parseWordOfDayMessage, sendWordOfDay } from "./wordOfDay.js";
@@ -21,7 +28,36 @@ const WELCOME_TEXT = [
   "📷 Пришли фото — я сам пойму, что на нём, и сделаю карточку. Если хочешь конкретное слово, добавь его в подпись.",
   "",
   "Повторение — свайпами в мини-приложении, по интервальной системе (SM2), как в Anki.",
+  "",
+  "🌐 /language — выбрать язык интерфейса приложения.",
 ].join("\n");
+
+// Confirmation shown in the language that was just picked, so the user gets
+// immediate feedback they can read regardless of their previous setting.
+const LANGUAGE_CONFIRM: Record<string, string> = {
+  en: "Interface language set to English ✅",
+  ru: "Язык интерфейса переключён на русский ✅",
+  uk: "Мову інтерфейсу змінено на українську ✅",
+  es: "Idioma de la interfaz cambiado a español ✅",
+  de: "Oberflächensprache auf Deutsch geändert ✅",
+  fr: "Langue de l’interface changée en français ✅",
+  pt: "Idioma da interface alterado para português ✅",
+  tr: "Arayüz dili Türkçe olarak ayarlandı ✅",
+  id: "Bahasa antarmuka diatur ke Bahasa Indonesia ✅",
+  zh: "界面语言已设置为中文 ✅",
+  hi: "इंटरफ़ेस भाषा हिन्दी में बदल दी गई ✅",
+  ar: "تم تغيير لغة الواجهة إلى العربية ✅",
+  fa: "زبان رابط به فارسی تغییر کرد ✅",
+};
+
+function languageKeyboard(): InlineKeyboard {
+  const kb = new InlineKeyboard();
+  Object.entries(LANGUAGE_NATIVE_NAMES).forEach(([code, name], i) => {
+    kb.text(name, `lang:${code}`);
+    if (i % 2 === 1) kb.row();
+  });
+  return kb;
+}
 
 /**
  * One-time bot profile setup on startup: the menu button next to the message
@@ -35,6 +71,7 @@ export async function setupBotProfile() {
       { command: "start", description: "Как пользоваться ботом" },
       { command: "app", description: "Открыть Simple Cards" },
       { command: "word", description: "Слово дня прямо сейчас" },
+      { command: "language", description: "Язык интерфейса / Interface language" },
     ]);
     await bot.api.raw.setChatMenuButton({
       menu_button: { type: "web_app", text: "Карточки", web_app: { url: env.MINI_APP_URL } },
@@ -57,6 +94,30 @@ bot.command("start", (ctx) => ctx.reply(WELCOME_TEXT, { reply_markup: miniAppKey
 bot.command("app", (ctx) =>
   ctx.reply("Открой Simple Cards, чтобы повторять карточки:", { reply_markup: miniAppKeyboard })
 );
+
+bot.command("language", (ctx) =>
+  ctx.reply("🌐 Выбери язык интерфейса Simple Cards / Choose your interface language:", {
+    reply_markup: languageKeyboard(),
+  })
+);
+
+bot.callbackQuery(/^lang:(.+)$/, async (ctx) => {
+  const code = ctx.match[1];
+  if (!LANGUAGE_NATIVE_NAMES[code]) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+
+  try {
+    const user = await userFromCtx(ctx);
+    await updateProfile(user.id, { interfaceLanguage: code });
+    await ctx.answerCallbackQuery({ text: LANGUAGE_NATIVE_NAMES[code] });
+    await ctx.editMessageText(LANGUAGE_CONFIRM[code] ?? "✅", { reply_markup: miniAppKeyboard });
+  } catch (err) {
+    console.error("Failed to set interface language", err);
+    await ctx.answerCallbackQuery({ text: "Error / Ошибка" });
+  }
+});
 
 bot.command("word", async (ctx) => {
   try {

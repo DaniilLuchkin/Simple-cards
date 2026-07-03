@@ -20,6 +20,7 @@ const profileSchema = z
   .object({
     learningLanguage: z.enum(LANGUAGE_CODES),
     translationLanguage: z.enum(LANGUAGE_CODES),
+    interfaceLanguage: z.enum(LANGUAGE_CODES),
     dailyGoal: z.number().int().min(1).max(500),
   })
   .partial()
