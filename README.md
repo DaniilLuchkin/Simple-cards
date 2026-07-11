@@ -76,8 +76,9 @@ pnpm dev                 # http://localhost:5173, ходит в API на :3000
 сразу проверять задеплоенную версию).
 
 OpenRouter: ключ на https://openrouter.ai/keys, модель задаётся `OPENROUTER_MODEL`
-(например `anthropic/claude-3.5-haiku`, `openai/gpt-4o-mini` — переключайте свободно,
-для генерации по фото нужна модель с поддержкой vision).
+(по умолчанию `openai/gpt-5.6-luna`; можно поставить любой slug OpenRouter —
+`anthropic/claude-3.5-haiku`, `google/gemini-3.5-flash` и т.д. — переключаются
+свободно, для генерации по фото нужна модель с поддержкой vision).
 
 Картинки из бота сохраняются на диск в `UPLOADS_DIR` (по умолчанию `./uploads`
 внутри `server/`, в `.gitignore`) и отдаются сервером по `/uploads/...` —

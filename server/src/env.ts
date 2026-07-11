@@ -30,7 +30,7 @@ const schema = z.object({
   DATABASE_URL: z.string().min(1),
 
   OPENROUTER_API_KEY: z.string().min(1),
-  OPENROUTER_MODEL: z.string().default("anthropic/claude-3.5-haiku"),
+  OPENROUTER_MODEL: z.string().default("openai/gpt-5.6-luna"),
   OPENROUTER_APP_NAME: z.string().default("Simple Cards"),
 
   // UTC hour at which the daily word-of-the-day is sent (9 = 12:00 MSK).
