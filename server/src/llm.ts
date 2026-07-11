@@ -104,11 +104,17 @@ export async function generateCardFromImage(
 }
 
 function wordOfDayPrompt({ learning, translation }: Languages): string {
-  return `You are the "word of the day" picker for "Simple Cards", a Telegram app for people learning ${learning} vocabulary.
+  return `You are the "word of the day" picker for "Simple Cards", a Telegram app for people learning ${learning} vocabulary. The user is NOT a beginner - they want to expand an already-decent vocabulary.
 
-Pick ONE genuinely useful ${learning} word or common expression (intermediate level): something a learner would actually use in conversation, work or travel. Not too basic, not obscure academic jargon. Vary the part of speech and topic from day to day.
+Pick ONE genuinely useful but non-obvious ${learning} word or idiomatic expression at UPPER-INTERMEDIATE to ADVANCED level (roughly CEFR B2-C1). It should be a word an educated native speaker uses naturally, but that an intermediate learner likely does NOT know yet.
 
-You are given a list of words the user already has - do NOT pick any of them or their close forms.
+Hard rules:
+- NEVER pick basic A1-B1 vocabulary. For English, words like "reliable", "keys", "backpack", "headphones", "commute", "happy", "important", "decide", "travel" are TOO SIMPLE - reject anything at that level.
+- Prefer precise, expressive, or idiomatic words: e.g. for English "meticulous", "underrated", "cope with", "resilient", "blatant", "tedious", "overwhelmed", "get the hang of", "far-fetched", "cut corners". Aim at that level of sophistication.
+- Not obscure literary or academic jargon nobody says out loud either. It must be useful in real conversation, work, or media.
+- Vary the part of speech, register, and topic strongly from day to day (include phrasal verbs and idioms sometimes, not only single adjectives).
+
+You are given a list of words the user already has - do NOT pick any of them or their close forms, and avoid anything at a similar or lower difficulty than the simplest ones there.
 
 For the picked word produce flashcard fields following these rules:
 - "word": the ${learning} word/expression itself.
