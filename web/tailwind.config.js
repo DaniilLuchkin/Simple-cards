@@ -25,6 +25,8 @@ export default {
       },
       fontFamily: {
         sans: ["-apple-system", "BlinkMacSystemFont", "Segoe UI", "Roboto", "sans-serif"],
+        // Meaning layer (headword + sentence). Sans stays the UI/metadata layer.
+        serif: ["Georgia", "Cambria", "Times New Roman", "serif"],
       },
       boxShadow: {
         soft: "0 8px 30px -8px rgba(58, 58, 69, 0.12)",

@@ -71,6 +71,22 @@ const en = {
   today: "Today",
   goalMet: "Daily goal reached! 🎉",
   activityTitle: "Activity",
+  srsHint: "Hint",
+  srsListen: "Listen",
+  srsWord: "word",
+  srsPhrase: "phrase",
+  srsCollocations: "Collocations",
+  srsYourNote: "Your association",
+  srsNotePlaceholder: "Add your own association…",
+  srsCardAria: "Flashcard, tap to flip",
+  gradeAgain: "Again",
+  gradeHard: "Hard",
+  gradeGood: "Good",
+  gradeEasy: "Easy",
+  unitLt10m: "<10 min",
+  unitDay: "d",
+  unitMonth: "mo",
+  unitYear: "y",
 } as const;
 
 export type StringKey = keyof typeof en;
@@ -94,6 +110,11 @@ const ru: Dict = {
   interfaceLanguage: "Язык интерфейса", iLearn: "Я изучаю", translateTo: "Переводить на",
   dailyGoal: "Цель в день (карточек)", streak: "Серия", dayStreak: "дней подряд", today: "Сегодня",
   goalMet: "Цель на день выполнена! 🎉", activityTitle: "Активность",
+  srsHint: "Подсказка", srsListen: "Озвучить", srsWord: "слово", srsPhrase: "фраза",
+  srsCollocations: "Сочетания", srsYourNote: "Твоя ассоциация",
+  srsNotePlaceholder: "Добавь свою ассоциацию…", srsCardAria: "Карточка, нажми, чтобы перевернуть",
+  gradeAgain: "Снова", gradeHard: "Трудно", gradeGood: "Хорошо", gradeEasy: "Легко",
+  unitLt10m: "<10 мин", unitDay: "д", unitMonth: "мес", unitYear: "г",
 };
 
 const uk: Dict = {
