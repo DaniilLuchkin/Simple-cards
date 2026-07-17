@@ -55,18 +55,30 @@ model Card {
   userId  String
   user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  // word == headword. example is the filled sentence (derived from `sentence`
+  // when present) so the library preview stays readable.
   word        String
   example     String
   explanation String
   translation String
   imageUrl    String?
 
+  // Rich SRS fields (added later; nullable/defaulted so pre-existing cards are
+  // valid). `sentence` is the cloze form containing "{{gap}}".
+  ipa          String?
+  pos          String?
+  forms        String[] @default([])
+  collocations String[] @default([])
+  sentence     String?
+  personalNote String   @default("")
+
   status CardStatus @default(ACTIVE)
 
-  // SM2 scheduling state
+  // SM2 scheduling state (easeFactor == ease, repetitions == reps).
   easeFactor   Float    @default(2.5)
   interval     Int      @default(0)
   repetitions  Int      @default(0)
+  lapses       Int      @default(0)
   dueAt        DateTime @default(now())
   lastReviewedAt DateTime?
 

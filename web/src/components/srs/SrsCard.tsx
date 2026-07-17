@@ -229,7 +229,10 @@ export function SrsCard({
             ))}
           </div>
 
-          <p className="text-base text-ink">{card.meaning}</p>
+          <div>
+            <p className="text-base text-ink">{card.meaning}</p>
+            {card.explanation && <p className="mt-1 text-sm text-muted">{card.explanation}</p>}
+          </div>
 
           <p className="font-serif text-lg leading-relaxed text-ink">
             {cloze.before}

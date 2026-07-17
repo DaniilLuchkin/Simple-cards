@@ -4,6 +4,7 @@ import type { Card } from "@prisma/client";
 import { prisma } from "./db.js";
 import { sm2 } from "./sm2.js";
 import { getProfile, recordReview, regenerateCardWithComment, updateProfile } from "./services.js";
+import { gradeSchedule } from "./srsSchedule.js";
 import { LANGUAGE_NAMES } from "./languages.js";
 import { absoluteImageUrl } from "./storage.js";
 
@@ -35,9 +36,21 @@ meRouter.patch("/", async (req, res) => {
   res.json({ profile: await updateProfile(req.dbUserId!, parsed.data) });
 });
 
-// The DB stores a relative image path; clients get a full URL.
+// The DB stores a relative image path; clients get a full URL. Also exposes the
+// scheduling state as a nested `srs` object matching the web SRS types
+// (easeFactor -> ease, repetitions -> reps), alongside the flat legacy fields.
 function toApiCard(card: Card) {
-  return { ...card, imageUrl: absoluteImageUrl(card.imageUrl) };
+  return {
+    ...card,
+    imageUrl: absoluteImageUrl(card.imageUrl),
+    srs: {
+      due: card.dueAt,
+      interval: card.interval,
+      ease: card.easeFactor,
+      reps: card.repetitions,
+      lapses: card.lapses,
+    },
+  };
 }
 
 // All cards due for review right now, oldest due date first.
@@ -89,13 +102,45 @@ cardsRouter.post("/:id/review", async (req, res) => {
   res.json({ card: toApiCard(updated) });
 });
 
-// Restores the SM2 state a card had before its last review, so the client can
-// offer "undo last swipe". The client sends back the snapshot it took before
-// reviewing; values are bounded to what sm2() can legitimately produce.
+// 4-grade review (Again/Hard/Good/Easy) for the SRS card.
+const gradeSchema = z.object({
+  grade: z.enum(["again", "hard", "good", "easy"]),
+});
+
+cardsRouter.post("/:id/grade", async (req, res) => {
+  const parsed = gradeSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten() });
+    return;
+  }
+
+  const card = await prisma.card.findFirst({
+    where: { id: req.params.id, userId: req.dbUserId! },
+  });
+  if (!card) {
+    res.status(404).json({ error: "Card not found" });
+    return;
+  }
+
+  const result = gradeSchedule(card, parsed.data.grade);
+  const updated = await prisma.card.update({
+    where: { id: card.id },
+    data: { ...result, lastReviewedAt: new Date() },
+  });
+
+  await recordReview(req.dbUserId!);
+
+  res.json({ card: toApiCard(updated) });
+});
+
+// Restores the scheduling state a card had before its last review, so the
+// client can offer "undo". The client sends back the snapshot it took before
+// reviewing; values are bounded to what the schedulers can legitimately produce.
 const undoSchema = z.object({
   easeFactor: z.number().min(1.3).max(10),
   interval: z.number().int().min(0).max(36500),
   repetitions: z.number().int().min(0).max(10000),
+  lapses: z.number().int().min(0).max(100000).optional(),
   dueAt: z.string().datetime(),
   lastReviewedAt: z.string().datetime().nullable(),
 });
@@ -121,6 +166,7 @@ cardsRouter.post("/:id/review/undo", async (req, res) => {
       easeFactor: parsed.data.easeFactor,
       interval: parsed.data.interval,
       repetitions: parsed.data.repetitions,
+      lapses: parsed.data.lapses ?? card.lapses,
       dueAt: new Date(parsed.data.dueAt),
       lastReviewedAt: parsed.data.lastReviewedAt ? new Date(parsed.data.lastReviewedAt) : null,
     },
@@ -159,6 +205,8 @@ const updateSchema = z
     example: z.string().min(1).max(500),
     explanation: z.string().min(1).max(1000),
     translation: z.string().min(1).max(300),
+    // The user's editable association from the SRS card back.
+    personalNote: z.string().max(1000),
   })
   .partial()
   .refine((data) => Object.keys(data).length > 0, { message: "No fields to update" });

@@ -30,6 +30,7 @@ export const drizzleCard: SrsCard = {
   pos: "глагол",
   forms: ["drizzled", "drizzling"],
   meaning: "моросить — идёт мелкий, лёгкий дождь",
+  explanation: "to rain lightly, in very small drops",
   sentence: "It's starting to {{gap}} again — classic Vancouver morning.",
   collocations: ["began to drizzle", "it drizzled all afternoon", "drizzle on and off"],
   imageUrl: drizzleImage,

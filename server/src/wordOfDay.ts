@@ -2,7 +2,7 @@ import { InlineKeyboard } from "grammy";
 import type { Bot } from "grammy";
 import { prisma } from "./db.js";
 import { env } from "./env.js";
-import { generateWordOfDay } from "./llm.js";
+import { filledSentence, generateWordOfDay } from "./llm.js";
 import type { GeneratedCardFields } from "./llm.js";
 import { languageNames } from "./languages.js";
 import { listUserWords } from "./services.js";
@@ -17,32 +17,49 @@ function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-// The plain-text layout of this message is also the storage format the
-// wod:add button parses the card fields back out of (survives restarts,
-// no callback-data size limits). Keep formatMessage and parseMessage in sync.
+// The plain-text layout of this message is also the fallback storage the
+// wod:add button parses fields back out of if the in-memory map was lost
+// (e.g. across a restart). Keep formatMessage and parseWordOfDayMessage in sync.
 function formatMessage(fields: GeneratedCardFields): string {
   return [
     "💡 Слово дня",
     "",
-    `<b>${escapeHtml(fields.word)}</b>`,
+    `<b>${escapeHtml(fields.headword)}</b>`,
     escapeHtml(fields.explanation),
     "",
-    `Пример: ${escapeHtml(fields.example)}`,
+    `Пример: ${escapeHtml(filledSentence(fields))}`,
     `Перевод: <tg-spoiler>${escapeHtml(fields.translation)}</tg-spoiler>`,
     "",
     "Добавить в колоду?",
   ].join("\n");
 }
 
+// Fields that survive in the message text; the rich extras (ipa/pos/forms/
+// collocations) are only recoverable from the in-memory map, so this fallback
+// produces a valid but simpler card.
 export function parseWordOfDayMessage(text: string): GeneratedCardFields | null {
   const lines = text.split("\n");
-  const word = lines[2]?.trim();
+  const headword = lines[2]?.trim();
   const explanation = lines[3]?.trim();
   const example = lines.find((l) => l.startsWith("Пример: "))?.slice("Пример: ".length).trim();
   const translation = lines.find((l) => l.startsWith("Перевод: "))?.slice("Перевод: ".length).trim();
-  if (!word || !explanation || !example || !translation) return null;
-  return { word, explanation, example, translation };
+  if (!headword || !explanation || !example || !translation) return null;
+  return {
+    headword,
+    ipa: "",
+    pos: "",
+    forms: [],
+    sentence: example,
+    explanation,
+    translation,
+    collocations: [],
+  };
 }
+
+// Full generated fields keyed by "<chatId>:<messageId>", so wod:add can create
+// a rich card without re-parsing the message. Lost on restart (falls back to
+// parseWordOfDayMessage) — fine for a single-process bot.
+export const pendingWordOfDay = new Map<string, GeneratedCardFields>();
 
 export async function sendWordOfDay(
   bot: Bot,
@@ -51,10 +68,11 @@ export async function sendWordOfDay(
   const existingWords = await listUserWords(user.id);
   const fields = await generateWordOfDay(existingWords, languageNames(user));
 
-  await bot.api.sendMessage(Number(user.telegramId), formatMessage(fields), {
+  const sent = await bot.api.sendMessage(Number(user.telegramId), formatMessage(fields), {
     parse_mode: "HTML",
     reply_markup: wordOfDayKeyboard,
   });
+  pendingWordOfDay.set(`${sent.chat.id}:${sent.message_id}`, fields);
 
   await prisma.user.update({
     where: { id: user.id },

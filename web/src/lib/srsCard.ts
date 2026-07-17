@@ -10,7 +10,8 @@ export type SrsCard = {
   ipa: string; // "/ˈdrɪz.əl/"
   pos: string; // part of speech, localized: "глагол"
   forms: string[]; // ["drizzled", "drizzling"]
-  meaning: string; // ONE sense only
+  meaning: string; // ONE sense only (the native-language gloss)
+  explanation?: string; // optional simpler same-language gloss, shown as secondary
   sentence: string; // contains GAP_TOKEN
   collocations: string[]; // 2-3 frequent collocations
   imageUrl?: string;

@@ -1,9 +1,40 @@
+import type { Card } from "@prisma/client";
 import { prisma } from "./db.js";
-import { generateCard, generateCardFromImage, regenerateCard } from "./llm.js";
+import { filledSentence, generateCard, generateCardFromImage, regenerateCard } from "./llm.js";
 import type { GeneratedCardFields } from "./llm.js";
 import { languageNames } from "./languages.js";
 import type { Languages } from "./languages.js";
 import { absoluteImageUrl } from "./storage.js";
+
+// Maps generated fields onto the Card columns. `word`/`example` mirror
+// `headword`/filled-sentence for the library preview and legacy compatibility.
+function cardColumns(fields: GeneratedCardFields) {
+  return {
+    word: fields.headword,
+    example: filledSentence(fields),
+    sentence: fields.sentence,
+    explanation: fields.explanation,
+    translation: fields.translation,
+    ipa: fields.ipa || null,
+    pos: fields.pos || null,
+    forms: fields.forms,
+    collocations: fields.collocations,
+  };
+}
+
+// Reconstructs generated-field shape from a stored card (for regeneration).
+function cardToFields(card: Card): GeneratedCardFields {
+  return {
+    headword: card.word,
+    ipa: card.ipa ?? "",
+    pos: card.pos ?? "",
+    forms: card.forms,
+    sentence: card.sentence ?? card.example,
+    explanation: card.explanation,
+    translation: card.translation,
+    collocations: card.collocations,
+  };
+}
 
 export async function getOrCreateUser(input: {
   telegramId: bigint;
@@ -44,7 +75,7 @@ export async function createCard(input: {
   });
 
   return prisma.card.create({
-    data: { userId: input.userId, ...fields, imageUrl: input.imagePath },
+    data: { userId: input.userId, ...cardColumns(fields), imageUrl: input.imagePath },
   });
 }
 
@@ -52,7 +83,7 @@ export async function createCard(input: {
 // of the day) - no LLM round-trip.
 export function createCardFromFields(input: { userId: string; fields: GeneratedCardFields }) {
   return prisma.card.create({
-    data: { userId: input.userId, ...input.fields },
+    data: { userId: input.userId, ...cardColumns(input.fields) },
   });
 }
 
@@ -76,7 +107,7 @@ export async function createCardFromImage(input: { userId: string; imagePath: st
   if (!fields) return null;
 
   return prisma.card.create({
-    data: { userId: input.userId, ...fields, imageUrl: input.imagePath },
+    data: { userId: input.userId, ...cardColumns(fields), imageUrl: input.imagePath },
   });
 }
 
@@ -90,18 +121,14 @@ export async function regenerateCardWithComment(input: {
   });
 
   const fields = await regenerateCard({
-    word: card.word,
-    previous: {
-      word: card.word,
-      example: card.example,
-      explanation: card.explanation,
-      translation: card.translation,
-    },
+    headword: card.word,
+    previous: cardToFields(card),
     userComment: input.comment,
     languages: await userLanguages(input.userId),
   });
 
-  return prisma.card.update({ where: { id: card.id }, data: fields });
+  // Keep the user's personal note across a regeneration.
+  return prisma.card.update({ where: { id: card.id }, data: cardColumns(fields) });
 }
 
 // UTC calendar day (matching ReviewDay.day @db.Date) for a given instant.

@@ -12,25 +12,37 @@ const API_URL = (() => {
   return /^https?:\/\//.test(cleaned) ? cleaned : `https://${cleaned}`;
 })();
 
+export type Grade = "again" | "hard" | "good" | "easy";
+
 export type Card = {
   id: string;
-  word: string;
-  example: string;
+  word: string; // == headword
+  example: string; // filled sentence
   explanation: string;
   translation: string;
   imageUrl: string | null;
-  // SM2 scheduling state - kept on the client so "undo last swipe" can send
-  // the pre-review snapshot back to the server.
+  // Rich SRS fields (may be null/empty on cards created before the extension).
+  ipa: string | null;
+  pos: string | null;
+  forms: string[];
+  collocations: string[];
+  sentence: string | null; // cloze form with {{gap}}
+  personalNote: string;
+  // Nested scheduling state used by the SRS card + grade buttons.
+  srs: { due: string; interval: number; ease: number; reps: number; lapses: number };
+  // Flat SM2 state - kept on the client so "undo" can send the pre-review
+  // snapshot back to the server.
   easeFactor: number;
   interval: number;
   repetitions: number;
+  lapses: number;
   dueAt: string;
   lastReviewedAt: string | null;
 };
 
 export type Sm2Snapshot = Pick<
   Card,
-  "easeFactor" | "interval" | "repetitions" | "dueAt" | "lastReviewedAt"
+  "easeFactor" | "interval" | "repetitions" | "lapses" | "dueAt" | "lastReviewedAt"
 >;
 
 export type Profile = {
@@ -77,6 +89,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ quality }),
     }),
+  gradeCard: (id: string, grade: Grade) =>
+    request<{ card: Card }>(`/api/cards/${id}/grade`, {
+      method: "POST",
+      body: JSON.stringify({ grade }),
+    }),
   undoReview: (id: string, snapshot: Sm2Snapshot) =>
     request<{ card: Card }>(`/api/cards/${id}/review/undo`, {
       method: "POST",
@@ -88,7 +105,10 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ comment }),
     }),
-  updateCard: (id: string, fields: Partial<Pick<Card, "word" | "example" | "explanation" | "translation">>) =>
+  updateCard: (
+    id: string,
+    fields: Partial<Pick<Card, "word" | "example" | "explanation" | "translation" | "personalNote">>
+  ) =>
     request<{ card: Card }>(`/api/cards/${id}`, {
       method: "PATCH",
       body: JSON.stringify(fields),

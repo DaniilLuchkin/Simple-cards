@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { api } from "./lib/api";
-import type { Card, Profile as ProfileData, ProfileUpdate, Sm2Snapshot } from "./lib/api";
+import type { Card, Grade, Profile as ProfileData, ProfileUpdate, Sm2Snapshot } from "./lib/api";
 import { usePrefs } from "./lib/prefs";
-import { CardStack } from "./components/CardStack";
+import { ReviewDeck } from "./components/ReviewDeck";
 import { Library } from "./components/Library";
 import { Profile } from "./components/Profile";
 import { TabBar } from "./components/TabBar";
@@ -22,6 +22,7 @@ function sm2Snapshot(card: Card): Sm2Snapshot {
     easeFactor: card.easeFactor,
     interval: card.interval,
     repetitions: card.repetitions,
+    lapses: card.lapses,
     dueAt: card.dueAt,
     lastReviewedAt: card.lastReviewedAt,
   };
@@ -68,8 +69,9 @@ export function App() {
     }
   }, [tab, allCards]);
 
-  async function handleSwiped(card: Card, direction: "left" | "right") {
+  async function handleGraded(card: Card, grade: Grade) {
     if (practiceCards) {
+      // Practice: advance without touching the schedule.
       setPracticeCards((prev) => prev?.filter((c) => c.id !== card.id) ?? prev);
       setUndoInfo({ card, snapshot: sm2Snapshot(card), practice: true });
       return;
@@ -78,11 +80,19 @@ export function App() {
     const snapshot = sm2Snapshot(card);
     setDueCards((prev) => prev?.filter((c) => c.id !== card.id) ?? prev);
     try {
-      await api.reviewCard(card.id, direction === "right" ? "remembered" : "forgot");
+      await api.gradeCard(card.id, grade);
       setUndoInfo({ card, snapshot, practice: false });
     } catch (err) {
       console.error("Failed to record review", err);
     }
+  }
+
+  function handleNoteChange(card: Card, note: string) {
+    const updated = { ...card, personalNote: note };
+    handleCardUpdated(updated);
+    api.updateCard(card.id, { personalNote: note }).catch((err) =>
+      console.error("Failed to save note", err)
+    );
   }
 
   async function handleUndo() {
@@ -145,13 +155,15 @@ export function App() {
           reviewCards === null ? (
             <p className="p-8 text-center text-sm text-muted">{t("loading")}</p>
           ) : (
-            <CardStack
+            <ReviewDeck
               cards={reviewCards}
               practice={practice}
+              learningLang={profile?.learningLanguage ?? "en"}
               canUndo={undoInfo !== null}
               onUndo={handleUndo}
               onStartPractice={startPractice}
-              onSwiped={handleSwiped}
+              onGraded={handleGraded}
+              onNoteChange={handleNoteChange}
               onCardUpdated={handleCardUpdated}
               onCardDeleted={handleCardDeleted}
             />

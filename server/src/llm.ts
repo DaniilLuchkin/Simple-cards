@@ -2,6 +2,7 @@ import { env } from "./env.js";
 import type { Languages } from "./languages.js";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+const GAP = "{{gap}}";
 
 type ChatContentPart =
   | { type: "text"; text: string }
@@ -13,23 +14,38 @@ type ChatMessage = {
 };
 
 export type GeneratedCardFields = {
-  word: string;
-  example: string;
-  explanation: string;
-  translation: string;
+  headword: string;
+  ipa: string;
+  pos: string; // in the translation language, e.g. "глагол"
+  forms: string[];
+  sentence: string; // cloze form containing {{gap}}
+  explanation: string; // simple, learning language, ONE sense
+  translation: string; // short, translation language, ONE sense
+  collocations: string[];
 };
 
-function cardSystemPrompt({ learning, translation }: Languages): string {
-  return `You are a card-writing assistant for "Simple Cards", a Telegram mini app for learning ${learning} vocabulary.
-Given a word or phrase (and optionally a user-provided example sentence and/or an image), produce a flashcard.
+const JSON_SHAPE =
+  '{"headword": string, "ipa": string, "pos": string, "forms": string[], "sentence": string, "explanation": string, "translation": string, "collocations": string[]}';
 
-Rules:
-- "word": the canonical ${learning} word/phrase, cleaned up (fix obvious typos, keep user's intended word). If the user typed it in another language, translate it to ${learning}.
-- "example": one natural example sentence in ${learning} using the word. If the user provided their own example, reuse it (lightly fixed for grammar) instead of writing a new one.
-- "explanation": an explanation of the word's meaning written in SIMPLE ${learning} (beginner level, short sentences, no rare words), as if explaining to a learner. Do not just repeat the word.
-- "translation": an accurate ${translation} translation of the word/phrase (a short translation, not a sentence).
+function fieldRules({ learning, translation }: Languages): string {
+  return `- "headword": the canonical ${learning} word/phrase, cleaned up. If the user typed it in another language, translate it to ${learning}.
+- "ipa": IPA transcription of the headword in slashes (e.g. "/ˈdrɪz.əl/"). Empty string if you are unsure.
+- "pos": part of speech written in ${translation} (e.g. the ${translation} word for "verb"/"noun"/"adjective").
+- "forms": 1-3 key inflected forms of the headword in ${learning} (e.g. ["drizzled", "drizzling"]). Empty array if not applicable.
+- "sentence": ONE natural example sentence in ${learning} using the word, but with the target word replaced by the literal token ${GAP}. Keep the rest of the sentence natural. Reuse the user's example (lightly fixed) if they gave one.
+- "explanation": the meaning in SIMPLE ${learning} (beginner level, short sentences). ONE sense only. Do not just repeat the word.
+- "translation": a short, accurate ${translation} translation. ONE sense only, matching "explanation".
+- "collocations": 2-3 frequent ${learning} collocations or set phrases with the word.
 
-Respond ONLY with a JSON object: {"word": string, "example": string, "explanation": string, "translation": string}`;
+Minimum-information principle: pick ONE sense of the word. Never combine multiple meanings into "explanation"/"translation" - if the word has several senses, choose the single most useful one.`;
+}
+
+function cardSystemPrompt(langs: Languages): string {
+  return `You are a flashcard writer for "Simple Cards", a Telegram app for learning ${langs.learning} vocabulary with spaced repetition.
+Produce ONE flashcard as a JSON object with these fields:
+${fieldRules(langs)}
+
+Respond ONLY with the JSON object: ${JSON_SHAPE}`;
 }
 
 export async function generateCard(input: {
@@ -62,17 +78,14 @@ export async function generateCard(input: {
   return parseGeneratedCard(content);
 }
 
-function imageSystemPrompt({ learning, translation }: Languages): string {
-  return `You are a card-writing assistant for "Simple Cards", a Telegram mini app for learning ${learning} vocabulary.
-The user sent a photo without any text. Identify the single most prominent object, action or concept in the photo.
+function imageSystemPrompt(langs: Languages): string {
+  return `You are a flashcard writer for "Simple Cards", a Telegram app for learning ${langs.learning} vocabulary.
+The user sent a photo without text. Identify the single most prominent object, action or concept.
 
-- If you can identify it confidently (a clear everyday object like headphones, a cup, a dog), produce a flashcard for its common ${learning} name following these rules:
-  - "word": the common ${learning} word for what's in the photo.
-  - "example": one natural example sentence in ${learning} using the word.
-  - "explanation": the word's meaning in SIMPLE ${learning} (beginner level, short sentences, no rare words). Do not just repeat the word.
-  - "translation": an accurate ${translation} translation of the word (short, not a sentence).
-  Respond: {"recognized": true, "word": string, "example": string, "explanation": string, "translation": string}
-- If the photo is ambiguous, abstract, or could reasonably be named many different ways, respond: {"recognized": false}
+- If you can name it confidently (a clear everyday object like headphones, a cup, a dog), produce a flashcard for its common ${langs.learning} name with these fields:
+${fieldRules(langs)}
+  Respond: {"recognized": true, ...the fields above...}
+- If the photo is ambiguous or could be named many ways, respond: {"recognized": false}
 
 Respond ONLY with the JSON object.`;
 }
@@ -103,26 +116,15 @@ export async function generateCardFromImage(
   return parseGeneratedCard(content);
 }
 
-function wordOfDayPrompt({ learning, translation }: Languages): string {
-  return `You are the "word of the day" picker for "Simple Cards", a Telegram app for people learning ${learning} vocabulary. The user is NOT a beginner - they want to expand an already-decent vocabulary.
+function wordOfDayPrompt(langs: Languages): string {
+  return `You are the "word of the day" picker for "Simple Cards", a Telegram app for people learning ${langs.learning} vocabulary. The user is NOT a beginner - they want to expand an already-decent vocabulary.
 
-Pick ONE genuinely useful but non-obvious ${learning} word or idiomatic expression at UPPER-INTERMEDIATE to ADVANCED level (roughly CEFR B2-C1). It should be a word an educated native speaker uses naturally, but that an intermediate learner likely does NOT know yet.
+Pick ONE genuinely useful but non-obvious ${langs.learning} word or idiomatic expression at UPPER-INTERMEDIATE to ADVANCED level (roughly CEFR B2-C1) - a word an educated native uses naturally but an intermediate learner likely doesn't know yet. NEVER pick basic A1-B1 vocabulary. Prefer precise/expressive/idiomatic words (adjectives, phrasal verbs, idioms). Not obscure academic jargon. Vary part of speech and topic day to day. Do NOT pick any word in the given "already has" list or its close forms.
 
-Hard rules:
-- NEVER pick basic A1-B1 vocabulary. For English, words like "reliable", "keys", "backpack", "headphones", "commute", "happy", "important", "decide", "travel" are TOO SIMPLE - reject anything at that level.
-- Prefer precise, expressive, or idiomatic words: e.g. for English "meticulous", "underrated", "cope with", "resilient", "blatant", "tedious", "overwhelmed", "get the hang of", "far-fetched", "cut corners". Aim at that level of sophistication.
-- Not obscure literary or academic jargon nobody says out loud either. It must be useful in real conversation, work, or media.
-- Vary the part of speech, register, and topic strongly from day to day (include phrasal verbs and idioms sometimes, not only single adjectives).
+Then produce a flashcard for the picked word as a JSON object:
+${fieldRules(langs)}
 
-You are given a list of words the user already has - do NOT pick any of them or their close forms, and avoid anything at a similar or lower difficulty than the simplest ones there.
-
-For the picked word produce flashcard fields following these rules:
-- "word": the ${learning} word/expression itself.
-- "example": one natural example sentence in ${learning} using it.
-- "explanation": its meaning in SIMPLE ${learning} (beginner level, short sentences, no rare words). Do not just repeat the word.
-- "translation": an accurate ${translation} translation (short, not a sentence).
-
-Respond ONLY with a JSON object: {"word": string, "example": string, "explanation": string, "translation": string}`;
+Respond ONLY with the JSON object: ${JSON_SHAPE}`;
 }
 
 export async function generateWordOfDay(
@@ -146,7 +148,7 @@ export async function generateWordOfDay(
 }
 
 export async function regenerateCard(input: {
-  word: string;
+  headword: string;
   previous: GeneratedCardFields;
   userComment: string;
   languages: Languages;
@@ -156,7 +158,7 @@ export async function regenerateCard(input: {
     {
       role: "user",
       content: [
-        `Word or phrase: ${input.word}`,
+        `Word or phrase: ${input.headword}`,
         `Previous card: ${JSON.stringify(input.previous)}`,
         `The user wants the card regenerated with this feedback: ${input.userComment}`,
         "Produce an improved card following the same rules and JSON format.",
@@ -197,6 +199,19 @@ async function chatCompletion(messages: ChatMessage[], opts?: { temperature?: nu
   return content;
 }
 
+function asStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((v) => String(v).trim()).filter(Boolean);
+}
+
+// Ensures the sentence carries the {{gap}} cloze token. If the model forgot it
+// but the headword appears in the sentence, gap that occurrence.
+function ensureCloze(sentence: string, headword: string): string {
+  if (sentence.includes(GAP)) return sentence;
+  const re = new RegExp(`\\b${headword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i");
+  return sentence.replace(re, GAP);
+}
+
 function parseGeneratedCard(raw: string): GeneratedCardFields {
   let parsed: unknown;
   try {
@@ -205,15 +220,30 @@ function parseGeneratedCard(raw: string): GeneratedCardFields {
     throw new Error(`LLM did not return valid JSON: ${raw}`);
   }
 
-  const obj = parsed as Partial<GeneratedCardFields>;
-  if (!obj.word || !obj.example || !obj.explanation || !obj.translation) {
+  const obj = parsed as Record<string, unknown>;
+  const headword = String(obj.headword ?? obj.word ?? "").trim();
+  const explanation = String(obj.explanation ?? "").trim();
+  const translation = String(obj.translation ?? "").trim();
+  const rawSentence = String(obj.sentence ?? obj.example ?? "").trim();
+
+  if (!headword || !explanation || !translation || !rawSentence) {
     throw new Error(`LLM JSON missing required fields: ${raw}`);
   }
 
   return {
-    word: obj.word.trim(),
-    example: obj.example.trim(),
-    explanation: obj.explanation.trim(),
-    translation: obj.translation.trim(),
+    headword,
+    ipa: String(obj.ipa ?? "").trim(),
+    pos: String(obj.pos ?? "").trim(),
+    forms: asStringArray(obj.forms),
+    sentence: ensureCloze(rawSentence, headword),
+    explanation,
+    translation,
+    collocations: asStringArray(obj.collocations).slice(0, 3),
   };
+}
+
+// The plain sentence with the gap filled by the headword - kept in `example`
+// for the library preview and backward compatibility.
+export function filledSentence(fields: Pick<GeneratedCardFields, "sentence" | "headword">): string {
+  return fields.sentence.split(GAP).join(fields.headword);
 }

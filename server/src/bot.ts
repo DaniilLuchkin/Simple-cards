@@ -11,7 +11,7 @@ import {
 import { LANGUAGE_NATIVE_NAMES } from "./languages.js";
 import { saveImage } from "./storage.js";
 import { parseWordInput } from "./parseInput.js";
-import { parseWordOfDayMessage, sendWordOfDay } from "./wordOfDay.js";
+import { parseWordOfDayMessage, pendingWordOfDay, sendWordOfDay } from "./wordOfDay.js";
 
 export const bot = new Bot(env.TELEGRAM_BOT_TOKEN);
 
@@ -129,11 +129,13 @@ bot.command("word", async (ctx) => {
   }
 });
 
-// "Add" button under a word-of-the-day message: the card fields are parsed
-// back out of the message text itself, so the button works across restarts.
+// "Add" button under a word-of-the-day message: prefer the full generated
+// fields stored in memory; fall back to re-parsing the message text (e.g. after
+// a restart) for a valid, simpler card.
 bot.callbackQuery("wod:add", async (ctx) => {
-  const text = ctx.callbackQuery.message?.text;
-  const fields = text ? parseWordOfDayMessage(text) : null;
+  const msg = ctx.callbackQuery.message;
+  const key = msg ? `${msg.chat.id}:${msg.message_id}` : "";
+  const fields = pendingWordOfDay.get(key) ?? (msg?.text ? parseWordOfDayMessage(msg.text) : null);
   if (!fields) {
     await ctx.answerCallbackQuery({ text: "Не удалось прочитать слово — пришли его текстом." });
     return;
@@ -144,7 +146,7 @@ bot.callbackQuery("wod:add", async (ctx) => {
     await createCardFromFields({ userId: user.id, fields });
     await ctx.answerCallbackQuery({ text: "Добавлено!" });
     await ctx.editMessageReplyMarkup(); // drop the buttons
-    await ctx.reply(`Готово! Карточка для «${fields.word}» добавлена.`, {
+    await ctx.reply(`Готово! Карточка для «${fields.headword}» добавлена.`, {
       reply_markup: miniAppKeyboard,
     });
   } catch (err) {

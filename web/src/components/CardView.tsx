@@ -5,8 +5,8 @@ import { usePrefs } from "../lib/prefs";
 
 /**
  * Two-sided card with a 3D flip. `flipped` is controlled by the parent
- * (SwipeCard toggles it on tap, CardDetail on click); the blurred-translation
- * reveal state lives here since both usages behave identically.
+ * CardDetail (library preview) toggles it on click; the blurred-translation
+ * reveal state lives here.
  */
 export function FlipCard({ card, flipped }: { card: Card; flipped: boolean }) {
   const [translationRevealed, setTranslationRevealed] = useState(false);
