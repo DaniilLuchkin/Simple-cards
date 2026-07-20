@@ -87,12 +87,18 @@ export function App() {
     }
   }
 
-  function handleNoteChange(card: Card, note: string) {
-    const updated = { ...card, personalNote: note };
-    handleCardUpdated(updated);
-    api.updateCard(card.id, { personalNote: note }).catch((err) =>
-      console.error("Failed to save note", err)
-    );
+  function handleCardEdited(card: Card, patch: Partial<Card>) {
+    handleCardUpdated({ ...card, ...patch });
+    api.updateCard(card.id, patch).catch((err) => console.error("Failed to save edit", err));
+  }
+
+  async function handleUploadImage(card: Card, file: File) {
+    try {
+      const { card: updated } = await api.uploadCardImage(card.id, file);
+      handleCardUpdated(updated);
+    } catch (err) {
+      console.error("Failed to upload image", err);
+    }
   }
 
   async function handleUndo() {
@@ -163,7 +169,8 @@ export function App() {
               onUndo={handleUndo}
               onStartPractice={startPractice}
               onGraded={handleGraded}
-              onNoteChange={handleNoteChange}
+              onEdit={handleCardEdited}
+              onUploadImage={handleUploadImage}
               onCardUpdated={handleCardUpdated}
               onCardDeleted={handleCardDeleted}
             />

@@ -1,4 +1,4 @@
-import { Router } from "express";
+import express, { Router } from "express";
 import { z } from "zod";
 import type { Card } from "@prisma/client";
 import { prisma } from "./db.js";
@@ -6,7 +6,7 @@ import { sm2 } from "./sm2.js";
 import { getProfile, recordReview, regenerateCardWithComment, updateProfile } from "./services.js";
 import { gradeSchedule } from "./srsSchedule.js";
 import { LANGUAGE_NAMES } from "./languages.js";
-import { absoluteImageUrl } from "./storage.js";
+import { absoluteImageUrl, saveImage } from "./storage.js";
 
 export const cardsRouter = Router();
 export const meRouter = Router();
@@ -205,6 +205,12 @@ const updateSchema = z
     example: z.string().min(1).max(500),
     explanation: z.string().min(1).max(1000),
     translation: z.string().min(1).max(300),
+    // Rich SRS fields, all editable in place from the review card.
+    sentence: z.string().max(500),
+    ipa: z.string().max(100),
+    pos: z.string().max(100),
+    forms: z.array(z.string().max(100)).max(20),
+    collocations: z.array(z.string().max(200)).max(20),
     // The user's editable association from the SRS card back.
     personalNote: z.string().max(1000),
   })
@@ -233,6 +239,38 @@ cardsRouter.patch("/:id", async (req, res) => {
 
   res.json({ card: toApiCard(updated) });
 });
+
+// Upload a custom image for a card. The raw image bytes are the request body
+// (Content-Type image/*); global express.json() ignores non-JSON bodies, so the
+// per-route express.raw parser owns it. Mirrors the bot's saveImage flow.
+cardsRouter.post(
+  "/:id/image",
+  express.raw({ type: "image/*", limit: "12mb" }),
+  async (req, res) => {
+    const card = await prisma.card.findFirst({
+      where: { id: req.params.id, userId: req.dbUserId! },
+    });
+    if (!card) {
+      res.status(404).json({ error: "Card not found" });
+      return;
+    }
+
+    const body = req.body as Buffer;
+    if (!Buffer.isBuffer(body) || body.length === 0) {
+      res.status(400).json({ error: "Empty image" });
+      return;
+    }
+
+    try {
+      const imageUrl = await saveImage(body, req.get("content-type") ?? "image/jpeg");
+      const updated = await prisma.card.update({ where: { id: card.id }, data: { imageUrl } });
+      res.json({ card: toApiCard(updated) });
+    } catch (err) {
+      console.error("Failed to save uploaded image", err);
+      res.status(500).json({ error: "Failed to save image" });
+    }
+  }
+);
 
 cardsRouter.delete("/:id", async (req, res) => {
   const card = await prisma.card.findFirst({

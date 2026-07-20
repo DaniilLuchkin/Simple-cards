@@ -31,13 +31,15 @@ function Demo() {
     <div className="mx-auto max-w-md px-4 py-6">
       <h1 className="mb-4 text-center text-lg font-semibold text-ink">SRS Card — drizzle</h1>
       <div className="flex flex-col gap-8">
-        <SrsCard card={card} learningLang="en-US" onGrade={handleGrade} onNoteChange={() => {}} />
+        <SrsCard card={card} learningLang="en-US" onGrade={handleGrade} onEdit={() => {}} />
         <SrsCard
           card={card}
           learningLang="en-US"
           defaultFlipped
           onGrade={handleGrade}
-          onNoteChange={(note) => setCard((c) => ({ ...c, personalNote: note }))}
+          onEdit={(patch) =>
+            setCard((c) => ({ ...c, personalNote: patch.personalNote ?? c.personalNote }))
+          }
         />
       </div>
       {log && <p className="mt-4 text-center text-sm text-muted">{log}</p>}

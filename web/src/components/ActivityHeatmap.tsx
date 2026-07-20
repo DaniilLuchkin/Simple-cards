@@ -1,4 +1,15 @@
+import { usePrefs } from "../lib/prefs";
+import type { Palette } from "../lib/prefs";
+
 const WEEKS = 18;
+
+// Heatmap fills follow the user's chosen palette (same hue, stronger so it
+// reads on white): [goal met, studied below goal].
+const HEATMAP: Record<Palette, { met: string; below: string }> = {
+  lavender: { met: "#8b5cf6", below: "#c4b5fd" },
+  mint: { met: "#10b981", below: "#6ee7b7" },
+  sky: { met: "#3b82f6", below: "#93c5fd" },
+};
 
 function utcToday(): Date {
   const now = new Date();
@@ -35,6 +46,8 @@ export function ActivityHeatmap({
   }
 
   const todayKey = key(today);
+  const { palette } = usePrefs();
+  const fill = HEATMAP[palette];
 
   return (
     <div className="flex justify-center gap-[3px]">
@@ -42,15 +55,14 @@ export function ActivityHeatmap({
         <div key={c} className="flex flex-col gap-[3px]">
           {col.map(({ date, count }, r) => {
             const isToday = key(date) === todayKey;
-            let cls = "bg-black/10";
-            if (count !== null && count > 0) {
-              cls = count >= goal ? "bg-emerald-500" : "bg-emerald-400/50";
-            }
+            const studied = count !== null && count > 0;
+            const bg = studied ? (count >= goal ? fill.met : fill.below) : undefined;
             return (
               <div
                 key={r}
                 title={count === null ? "" : `${key(date)}: ${count}`}
-                className={`h-3 w-3 rounded-[3px] ${count === null ? "opacity-0" : cls} ${
+                style={bg ? { backgroundColor: bg } : undefined}
+                className={`h-3 w-3 rounded-[3px] ${count === null ? "opacity-0" : studied ? "" : "bg-black/10"} ${
                   isToday ? "ring-2 ring-black" : ""
                 }`}
               />

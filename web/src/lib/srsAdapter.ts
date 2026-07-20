@@ -2,9 +2,10 @@ import type { Card } from "./api";
 import { GAP_TOKEN } from "./srsCard";
 import type { SrsCard } from "./srsCard";
 
-// Turns a "meaning" of one word into a cloze by gapping the first occurrence of
-// the headword — used for legacy cards that have no stored `sentence`.
-function deriveCloze(example: string, headword: string): string {
+// Turns a filled sentence into a cloze by gapping the first occurrence of the
+// headword — used for legacy cards with no stored `sentence`, and when the user
+// edits the filled sentence in place on the review card.
+export function deriveCloze(example: string, headword: string): string {
   const re = new RegExp(`\\b${headword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i");
   return re.test(example) ? example.replace(re, GAP_TOKEN) : example;
 }

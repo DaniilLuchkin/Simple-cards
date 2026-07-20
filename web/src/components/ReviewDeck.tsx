@@ -17,7 +17,8 @@ export function ReviewDeck({
   onUndo,
   onStartPractice,
   onGraded,
-  onNoteChange,
+  onEdit,
+  onUploadImage,
   onCardUpdated,
   onCardDeleted,
 }: {
@@ -28,7 +29,8 @@ export function ReviewDeck({
   onUndo: () => void;
   onStartPractice: () => void;
   onGraded: (card: Card, grade: Grade) => void;
-  onNoteChange: (card: Card, note: string) => void;
+  onEdit: (card: Card, patch: Partial<Card>) => void;
+  onUploadImage: (card: Card, file: File) => void;
   onCardUpdated: (card: Card) => void;
   onCardDeleted: (id: string) => void;
 }) {
@@ -104,7 +106,8 @@ export function ReviewDeck({
           card={toSrsCard(top)}
           learningLang={learningLang}
           onGrade={(grade) => onGraded(top, grade)}
-          onNoteChange={(note) => onNoteChange(top, note)}
+          onEdit={(patch) => onEdit(top, patch)}
+          onUploadImage={(file) => onUploadImage(top, file)}
         />
       </div>
 

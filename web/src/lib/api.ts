@@ -107,12 +107,43 @@ export const api = {
     }),
   updateCard: (
     id: string,
-    fields: Partial<Pick<Card, "word" | "example" | "explanation" | "translation" | "personalNote">>
+    fields: Partial<
+      Pick<
+        Card,
+        | "word"
+        | "example"
+        | "explanation"
+        | "translation"
+        | "personalNote"
+        | "sentence"
+        | "ipa"
+        | "pos"
+        | "forms"
+        | "collocations"
+      >
+    >
   ) =>
     request<{ card: Card }>(`/api/cards/${id}`, {
       method: "PATCH",
       body: JSON.stringify(fields),
     }),
+  // Uploads raw image bytes (not JSON), so it bypasses the request() helper to
+  // set the file's own Content-Type.
+  uploadCardImage: async (id: string, file: File): Promise<{ card: Card }> => {
+    const res = await fetch(`${API_URL}/api/cards/${id}/image`, {
+      method: "POST",
+      headers: {
+        "Content-Type": file.type || "image/jpeg",
+        "X-Telegram-Init-Data": getInitData(),
+      },
+      body: file,
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error ? JSON.stringify(body.error) : `Upload failed: ${res.status}`);
+    }
+    return res.json() as Promise<{ card: Card }>;
+  },
   getProfile: () => request<{ profile: Profile }>("/api/me"),
   updateProfile: (update: ProfileUpdate) =>
     request<{ profile: Profile }>("/api/me", {
