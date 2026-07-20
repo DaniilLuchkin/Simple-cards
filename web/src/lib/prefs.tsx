@@ -33,7 +33,7 @@ export function PrefsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
     localStorage.setItem("theme", theme);
-    const bg = theme === "dark" ? "#191919" : "#eae3f7";
+    const bg = theme === "dark" ? "#3c3d44" : "#eae3f7";
     const webApp = getTelegramWebApp();
     webApp?.setBackgroundColor(bg);
     webApp?.setHeaderColor(bg);

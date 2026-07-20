@@ -16,7 +16,7 @@ export function TabBar({ tab, onChange }: { tab: Tab; onChange: (tab: Tab) => vo
     // absolute positioning, no nested scroll region - just plain flex flow).
     // If long labels (e.g. Russian/Ukrainian) ever don't fit a narrow phone,
     // the whole row scrolls horizontally instead of clipping or overlapping.
-    <div className="flex items-center gap-1.5 overflow-x-auto py-2">
+    <div className="-mx-4 flex items-center gap-1.5 overflow-x-auto px-4 py-2">
       {items.map((item) => (
         <button
           key={item.id}

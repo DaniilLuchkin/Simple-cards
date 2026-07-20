@@ -24,7 +24,7 @@
 
 .dark {
   /* cards stay white; only the canvas goes dark */
-  --c-bg: 25 25 25; /* #191919 flat charcoal, no blue glow */
+  --c-bg: 60 61 68; /* #3C3D44 light slate so the black card outline reads */
   --c-oncanvas: 238 242 249;
 }
 
