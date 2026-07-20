@@ -37,7 +37,7 @@ export function ActivityHeatmap({
   const todayKey = key(today);
 
   return (
-    <div className="flex justify-center gap-[3px] overflow-x-auto">
+    <div className="flex justify-center gap-[3px]">
       {columns.map((col, c) => (
         <div key={c} className="flex flex-col gap-[3px]">
           {col.map(({ date, count }, r) => {
@@ -50,7 +50,7 @@ export function ActivityHeatmap({
               <div
                 key={r}
                 title={count === null ? "" : `${key(date)}: ${count}`}
-                className={`h-3.5 w-3.5 rounded-[3px] ${count === null ? "opacity-0" : cls} ${
+                className={`h-3 w-3 rounded-[3px] ${count === null ? "opacity-0" : cls} ${
                   isToday ? "ring-2 ring-black" : ""
                 }`}
               />

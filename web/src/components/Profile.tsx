@@ -23,7 +23,7 @@ export function Profile({
   }
 
   return (
-    <div className="flex h-full flex-col gap-5 overflow-y-auto pb-8">
+    <div className="-mx-2 flex h-full flex-col gap-5 overflow-y-auto px-2 pb-8 pt-1">
       {/* Streak + today's progress */}
       <div className="rounded-2xl border-2 border-black bg-surface p-5 shadow-toon">
         <div className="flex items-center justify-between">

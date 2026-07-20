@@ -162,12 +162,14 @@ export function SrsCard({
             </button>
             {hintStep >= 1 && (
               <div className="flex flex-wrap gap-2 text-sm">
-                <span className="rounded-full border border-black px-3 py-1 text-muted">{card.pos}</span>
-                {hintStep >= 2 && (
-                  <span className="rounded-full border border-black px-3 py-1 font-serif text-ink">
-                    {card.headword.slice(0, Math.min(3, card.headword.length))}…
-                  </span>
+                {card.pos && (
+                  <span className="rounded-full border border-black px-3 py-1 text-muted">{card.pos}</span>
                 )}
+                {/* Always reveal at least the first letter so the very first
+                    tap gives a real hint (pos may be empty on legacy cards). */}
+                <span className="rounded-full border border-black px-3 py-1 font-serif text-ink">
+                  {card.headword.slice(0, hintStep >= 2 ? Math.min(3, card.headword.length) : 1)}…
+                </span>
               </div>
             )}
           </div>

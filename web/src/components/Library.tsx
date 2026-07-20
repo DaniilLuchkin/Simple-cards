@@ -90,7 +90,7 @@ export function Library({
         )}
       </div>
 
-      <div className="flex flex-1 flex-col gap-3 overflow-y-auto pb-6">
+      <div className="-mx-2 flex flex-1 flex-col gap-3 overflow-y-auto px-2 pb-6 pt-1">
         {cards.map((card) => (
           <LibraryRow
             key={card.id}
