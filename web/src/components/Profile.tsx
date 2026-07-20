@@ -25,7 +25,7 @@ export function Profile({
   return (
     <div className="flex h-full flex-col gap-5 overflow-y-auto pb-8">
       {/* Streak + today's progress */}
-      <div className="rounded-2xl bg-mint-fill p-5">
+      <div className="rounded-2xl border-2 border-black bg-surface p-5 shadow-toon">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-3xl font-bold text-ink">🔥 {profile.streak}</p>
@@ -39,23 +39,23 @@ export function Profile({
             <p className="text-sm text-muted">{t("today")}</p>
           </div>
         </div>
-        {goalMet && <p className="mt-3 text-center text-sm font-medium text-emerald-500">{t("goalMet")}</p>}
+        {goalMet && <p className="mt-3 text-center text-sm font-semibold text-emerald-600">{t("goalMet")}</p>}
       </div>
 
       {/* Activity heatmap */}
-      <div className="rounded-2xl bg-sky-fill p-5">
-        <p className="mb-3 text-sm font-medium text-muted">{t("activityTitle")}</p>
+      <div className="rounded-2xl border-2 border-black bg-surface p-5 shadow-toon">
+        <p className="mb-3 text-sm font-semibold text-muted">{t("activityTitle")}</p>
         <ActivityHeatmap activity={profile.activity} goal={profile.dailyGoal} />
       </div>
 
       {/* Daily goal stepper */}
-      <div className="flex items-center justify-between rounded-2xl bg-lilac-fill px-4 py-3">
+      <div className="flex items-center justify-between rounded-2xl border-2 border-black bg-surface px-4 py-3 shadow-toon">
         <span className="text-sm text-ink">{t("dailyGoal")}</span>
         <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={() => commitGoal(goal - 1)}
-            className="h-8 w-8 rounded-full bg-surface text-lg font-semibold text-ink"
+            className="h-8 w-8 rounded-full border-2 border-black bg-white text-lg font-semibold text-ink shadow-toon-sm"
           >
             −
           </button>
@@ -63,7 +63,7 @@ export function Profile({
           <button
             type="button"
             onClick={() => commitGoal(goal + 1)}
-            className="h-8 w-8 rounded-full bg-surface text-lg font-semibold text-ink"
+            className="h-8 w-8 rounded-full border-2 border-black bg-white text-lg font-semibold text-ink shadow-toon-sm"
           >
             +
           </button>

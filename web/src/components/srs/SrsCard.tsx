@@ -108,7 +108,7 @@ export function SrsCard({
 
   const sectionLabel = "text-xs font-semibold uppercase tracking-wide text-muted";
   const faceBase =
-    "absolute inset-0 flex flex-col gap-5 overflow-y-auto rounded-[20px] border border-line bg-surface p-6 [backface-visibility:hidden]";
+    "absolute inset-0 flex flex-col gap-5 overflow-y-auto rounded-[18px] border-2 border-black bg-surface p-6 [backface-visibility:hidden]";
 
   return (
     <div
@@ -120,7 +120,7 @@ export function SrsCard({
       className="mx-auto h-[560px] w-full max-w-sm cursor-pointer select-none outline-none [perspective:1200px]"
     >
       <div
-        className="relative h-full w-full rounded-[20px] shadow-soft [transform-style:preserve-3d]"
+        className="relative h-full w-full rounded-[18px] shadow-toon [transform-style:preserve-3d]"
         style={{
           transform: flipped ? "rotateY(180deg)" : "none",
           transition: reduceMotion ? "none" : "transform 0.5s",
@@ -135,7 +135,7 @@ export function SrsCard({
 
           <p className="font-serif text-2xl leading-relaxed text-ink">
             {cloze.before}
-            <span className="mx-0.5 inline-flex min-w-[3.5rem] items-center justify-center rounded-md bg-accent-soft px-2 align-baseline text-muted">
+            <span className="mx-0.5 inline-flex min-w-[3.5rem] items-center justify-center rounded-md border-2 border-black bg-gap px-2 align-baseline text-ink">
               …
             </span>
             {cloze.after}
@@ -146,7 +146,7 @@ export function SrsCard({
               <img
                 src={card.imageUrl}
                 alt=""
-                className="h-28 w-28 rounded-2xl object-contain"
+                className="h-28 w-28 rounded-2xl border-2 border-black bg-white object-contain"
                 onError={(e) => (e.currentTarget.style.display = "none")}
               />
             </div>
@@ -156,15 +156,15 @@ export function SrsCard({
             <button
               type="button"
               onClick={cycleHint}
-              className="rounded-full border border-dashed border-accent/60 px-4 py-2 text-sm font-medium text-accent"
+              className="rounded-full border-2 border-dashed border-black px-4 py-2 text-sm font-semibold text-ink"
             >
               {t("srsHint")}
             </button>
             {hintStep >= 1 && (
               <div className="flex flex-wrap gap-2 text-sm">
-                <span className="rounded-full border border-line px-3 py-1 text-muted">{card.pos}</span>
+                <span className="rounded-full border border-black px-3 py-1 text-muted">{card.pos}</span>
                 {hintStep >= 2 && (
-                  <span className="rounded-full border border-line px-3 py-1 font-serif text-ink">
+                  <span className="rounded-full border border-black px-3 py-1 font-serif text-ink">
                     {card.headword.slice(0, Math.min(3, card.headword.length))}…
                   </span>
                 )}
@@ -182,7 +182,7 @@ export function SrsCard({
                 lang: learningLang,
               });
             }}
-            className="mt-auto flex h-11 w-11 items-center justify-center self-start rounded-full bg-accent-soft text-lg text-accent"
+            className="mt-auto flex h-11 w-11 items-center justify-center self-start rounded-full border-2 border-black bg-white text-lg shadow-toon-sm"
           >
             🔊
           </button>
@@ -205,7 +205,7 @@ export function SrsCard({
                 stop(e);
                 speak(card.headword, { audioUrl: card.audioUrl, lang: learningLang });
               }}
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-accent-soft text-accent"
+              className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-black bg-white shadow-toon-sm"
             >
               🔊
             </button>
@@ -219,10 +219,10 @@ export function SrsCard({
           {(card.pos || card.forms.length > 0) && (
             <div className="flex flex-wrap gap-2 text-sm">
               {card.pos && (
-                <span className="rounded-full border border-line px-3 py-1 text-muted">{card.pos}</span>
+                <span className="rounded-full border border-black px-3 py-1 text-ink">{card.pos}</span>
               )}
               {card.forms.length > 0 && (
-                <span className="rounded-full border border-line px-3 py-1 font-serif text-muted">
+                <span className="rounded-full border border-black px-3 py-1 font-serif text-ink">
                   {card.forms.join(" · ")}
                 </span>
               )}
@@ -231,21 +231,21 @@ export function SrsCard({
 
           <p className="font-serif text-lg leading-relaxed text-ink">
             {cloze.before}
-            <span className="rounded-md bg-accent-soft px-1 font-semibold text-accent">{card.headword}</span>
+            <span className="rounded-md bg-gap px-1 font-semibold text-ink">{card.headword}</span>
             {cloze.after}
           </p>
 
           {card.collocations.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {card.collocations.map((c) => (
-                <span key={c} className="rounded-full bg-accent-soft px-3 py-1.5 text-sm text-accent">
+                <span key={c} className="rounded-full border border-black bg-sky px-3 py-1.5 text-sm text-ink">
                   {c}
                 </span>
               ))}
             </div>
           )}
 
-          <div className="border-l-2 border-accent pl-3">
+          <div className="border-l-[3px] border-black pl-3">
             <textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
@@ -264,10 +264,10 @@ export function SrsCard({
                 key={g}
                 type="button"
                 onClick={(e) => grade(g, e)}
-                className={`flex min-h-[52px] flex-col items-center justify-center rounded-xl px-1 text-white ${GRADE_BG[g]}`}
+                className={`flex min-h-[52px] flex-col items-center justify-center rounded-xl border-2 border-black px-1 text-ink shadow-toon-sm ${GRADE_BG[g]}`}
               >
-                <span className="text-sm font-semibold leading-tight">{t(GRADE_LABEL[g])}</span>
-                <span className="text-[11px] opacity-90">{formatInterval(intervals[g], units)}</span>
+                <span className="text-sm font-bold leading-tight">{t(GRADE_LABEL[g])}</span>
+                <span className="text-[11px] opacity-80">{formatInterval(intervals[g], units)}</span>
               </button>
             ))}
           </div>

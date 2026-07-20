@@ -74,14 +74,14 @@ export function CardDetail({
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-page">
-      <div className="flex items-center justify-between px-4 pt-[max(env(safe-area-inset-top),1rem)]">
-        <button type="button" onClick={onClose} className="rounded-full p-2 text-sm text-muted">
+      <div className="flex items-center justify-between px-4 pt-[max(env(safe-area-inset-top),1rem)] text-oncanvas">
+        <button type="button" onClick={onClose} className="rounded-full p-2 text-sm">
           ✕ {t("close")}
         </button>
         <button
           type="button"
           onClick={() => setEditing((e) => !e)}
-          className="rounded-full bg-sky/40 px-4 py-1.5 text-sm font-medium text-ink dark:bg-sky/20"
+          className="rounded-full border-2 border-black bg-sky px-4 py-1.5 text-sm font-semibold text-ink shadow-toon-sm"
         >
           {editing ? t("cancel") : t("edit")}
         </button>
@@ -112,7 +112,7 @@ export function CardDetail({
               type="button"
               disabled={busy}
               onClick={handleSave}
-              className="rounded-2xl bg-mint/50 px-4 py-2.5 text-sm font-medium text-ink shadow-soft disabled:opacity-50 dark:bg-mint/25"
+              className="rounded-2xl border-2 border-black bg-mint px-4 py-2.5 text-sm font-semibold text-ink shadow-toon-sm disabled:opacity-50"
             >
               {busy ? t("saving") : t("save")}
             </button>
@@ -132,7 +132,7 @@ export function CardDetail({
           type="button"
           disabled={busy}
           onClick={handleDelete}
-          className="rounded-full bg-blush/40 px-5 py-2.5 text-sm font-medium text-ink shadow-soft disabled:opacity-50 dark:bg-blush/20"
+          className="rounded-full border-2 border-black bg-blush px-5 py-2.5 text-sm font-semibold text-ink shadow-toon-sm disabled:opacity-50"
         >
           {t("delete")}
         </button>
@@ -140,7 +140,7 @@ export function CardDetail({
           type="button"
           disabled={busy}
           onClick={() => setRegenerating(true)}
-          className="rounded-full bg-butter/50 px-5 py-2.5 text-sm font-medium text-ink shadow-soft disabled:opacity-50 dark:bg-butter/20"
+          className="rounded-full border-2 border-black bg-butter px-5 py-2.5 text-sm font-semibold text-ink shadow-toon-sm disabled:opacity-50"
         >
           {t("regenerate")}
         </button>
@@ -169,10 +169,10 @@ function Field({
   multiline?: boolean;
 }) {
   const inputClass =
-    "rounded-2xl border border-sky/60 bg-sky/10 p-3 text-sm text-ink outline-none focus:border-sky dark:border-sky/25";
+    "rounded-2xl border-2 border-black bg-white p-3 text-sm text-ink outline-none";
   return (
-    <label className="flex flex-col gap-1.5 text-left">
-      <span className="text-xs font-medium text-muted">{label}</span>
+    <label className="flex flex-col gap-1.5 text-left text-oncanvas">
+      <span className="text-xs font-semibold">{label}</span>
       {multiline ? (
         <textarea value={value} onChange={(e) => onChange(e.target.value)} rows={3} className={inputClass} />
       ) : (

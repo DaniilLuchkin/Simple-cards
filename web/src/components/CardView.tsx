@@ -38,12 +38,12 @@ export function FlipCard({ card, flipped }: { card: Card; flipped: boolean }) {
 function CardFront({ card }: { card: Card }) {
   const { t } = usePrefs();
   return (
-    <div className="flex h-full w-full flex-col gap-5 rounded-card bg-sky-fill p-7">
+    <div className="flex h-full w-full flex-col gap-5 rounded-[18px] border-2 border-black bg-surface p-7">
       {card.imageUrl && (
         <img
           src={card.imageUrl}
           alt=""
-          className="mx-auto max-h-[45%] max-w-full rounded-2xl object-contain shadow-soft"
+          className="mx-auto max-h-[45%] max-w-full rounded-2xl border-2 border-black object-contain"
           // If the file is gone (e.g. deploy without a persistent volume),
           // hide the slot instead of showing a broken-image icon.
           onError={(e) => (e.currentTarget.style.display = "none")}
@@ -69,21 +69,19 @@ function CardBack({
 }) {
   const { t } = usePrefs();
   return (
-    <div className="flex h-full w-full flex-col gap-5 rounded-card bg-lilac-fill p-7">
+    <div className="flex h-full w-full flex-col gap-5 rounded-[18px] border-2 border-black bg-surface p-7">
       <div className="flex flex-1 flex-col items-center justify-center gap-6 text-center">
         <p className="text-lg leading-relaxed text-ink">{card.explanation}</p>
         <button
           type="button"
-          // Tapping the translation must not flip the card. stopPropagation
-          // handles CardDetail's React onClick; SwipeCard's framer-motion tap
-          // listens on raw pointer events that fire before React's, so it
-          // checks for this marker instead.
+          // Tapping the translation must not flip the card (stopPropagation
+          // covers CardDetail's React onClick).
           data-no-flip
           onClick={(e) => {
             e.stopPropagation();
             onRevealTranslation();
           }}
-          className="rounded-2xl bg-white/60 px-5 py-3 text-lg font-medium text-ink shadow-soft transition dark:bg-white/10"
+          className="rounded-2xl border-2 border-black bg-gap px-5 py-3 text-lg font-semibold text-ink transition"
         >
           <span className={translationRevealed ? "" : "blur-sm select-none"}>{card.translation}</span>
         </button>

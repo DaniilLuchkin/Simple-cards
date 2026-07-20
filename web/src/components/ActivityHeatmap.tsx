@@ -42,16 +42,16 @@ export function ActivityHeatmap({
         <div key={c} className="flex flex-col gap-[3px]">
           {col.map(({ date, count }, r) => {
             const isToday = key(date) === todayKey;
-            let cls = "bg-sky/20 dark:bg-white/5";
+            let cls = "bg-black/10";
             if (count !== null && count > 0) {
-              cls = count >= goal ? "bg-emerald-500" : "bg-emerald-400/40";
+              cls = count >= goal ? "bg-emerald-500" : "bg-emerald-400/50";
             }
             return (
               <div
                 key={r}
                 title={count === null ? "" : `${key(date)}: ${count}`}
                 className={`h-3.5 w-3.5 rounded-[3px] ${count === null ? "opacity-0" : cls} ${
-                  isToday ? "ring-2 ring-emerald-500/60" : ""
+                  isToday ? "ring-2 ring-black" : ""
                 }`}
               />
             );

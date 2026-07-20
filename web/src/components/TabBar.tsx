@@ -16,14 +16,16 @@ export function TabBar({ tab, onChange }: { tab: Tab; onChange: (tab: Tab) => vo
     // absolute positioning, no nested scroll region - just plain flex flow).
     // If long labels (e.g. Russian/Ukrainian) ever don't fit a narrow phone,
     // the whole row scrolls horizontally instead of clipping or overlapping.
-    <div className="flex items-center gap-1 overflow-x-auto py-2">
+    <div className="flex items-center gap-1.5 overflow-x-auto py-2">
       {items.map((item) => (
         <button
           key={item.id}
           type="button"
           onClick={() => onChange(item.id)}
-          className={`shrink-0 rounded-full px-2.5 py-1.5 text-sm font-medium transition ${
-            tab === item.id ? "bg-sky/50 text-ink shadow-soft dark:bg-sky/25" : "bg-transparent text-muted"
+          className={`shrink-0 rounded-full border-2 px-2.5 py-1 text-sm font-semibold transition ${
+            tab === item.id
+              ? "border-black bg-sky text-ink shadow-toon-sm"
+              : "border-transparent bg-transparent text-oncanvas"
           }`}
         >
           {item.label}
@@ -33,7 +35,7 @@ export function TabBar({ tab, onChange }: { tab: Tab; onChange: (tab: Tab) => vo
         type="button"
         onClick={toggleTheme}
         aria-label="Toggle theme"
-        className="ml-auto flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sky/40 text-sm dark:bg-sky/20"
+        className="ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 border-black bg-white text-sm shadow-toon-sm"
       >
         {theme === "dark" ? "☀️" : "🌙"}
       </button>

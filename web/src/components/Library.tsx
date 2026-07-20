@@ -57,7 +57,7 @@ export function Library({
 
   if (cards.length === 0) {
     return (
-      <div className="flex h-full items-center justify-center text-center text-sm text-muted">
+      <div className="flex h-full items-center justify-center text-center text-sm text-oncanvas opacity-70">
         {t("libEmpty")}
       </div>
     );
@@ -65,26 +65,26 @@ export function Library({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between px-1 pb-2">
-        <span className="text-xs text-muted">
+      <div className="flex items-center justify-between px-1 pb-2 text-oncanvas">
+        <span className="text-xs opacity-70">
           {selectMode ? `${checked.size} ${t("selected")}` : t("swipeToDelete")}
         </span>
         {selectMode ? (
           <div className="flex gap-2">
-            <button type="button" onClick={exitSelect} className="text-sm text-muted">
+            <button type="button" onClick={exitSelect} className="text-sm opacity-70">
               {t("cancel")}
             </button>
             <button
               type="button"
               disabled={busy || checked.size === 0}
               onClick={deleteChecked}
-              className="text-sm font-medium text-rose-500 disabled:opacity-40"
+              className="text-sm font-semibold text-rose-500 disabled:opacity-40"
             >
               {t("deleteSelected")}
             </button>
           </div>
         ) : (
-          <button type="button" onClick={() => setSelectMode(true)} className="text-sm font-medium text-ink">
+          <button type="button" onClick={() => setSelectMode(true)} className="text-sm font-semibold">
             {t("select")}
           </button>
         )}
@@ -144,7 +144,7 @@ function LibraryRow({
   return (
     <div className="relative">
       {/* Red "delete" backdrop revealed as the row slides left. */}
-      <div className="absolute inset-0 flex items-center justify-end rounded-2xl bg-rose-500/90 pr-5 text-sm font-semibold text-white">
+      <div className="absolute inset-0 flex items-center justify-end rounded-2xl border-2 border-black bg-rose-500 pr-5 text-sm font-bold text-white">
         {t("delete")}
       </div>
 
@@ -156,12 +156,12 @@ function LibraryRow({
         dragConstraints={{ left: 0, right: 0 }}
         dragElastic={{ left: 0.7, right: 0 }}
         onDragEnd={handleDragEnd}
-        className="relative flex w-full items-center gap-3 rounded-2xl bg-mint-fill p-4 text-left shadow-soft"
+        className="relative flex w-full items-center gap-3 rounded-2xl border-2 border-black bg-surface p-4 text-left shadow-toon-sm"
       >
         {selectMode && (
           <span
-            className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 ${
-              checked ? "border-emerald-500 bg-emerald-500 text-white" : "border-muted/50 text-transparent"
+            className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-black ${
+              checked ? "bg-emerald-400 text-ink" : "bg-white text-transparent"
             }`}
           >
             ✓
@@ -171,7 +171,7 @@ function LibraryRow({
           <img
             src={card.imageUrl}
             alt=""
-            className="h-14 w-14 shrink-0 rounded-xl object-cover"
+            className="h-14 w-14 shrink-0 rounded-xl border-2 border-black object-cover"
             onError={(e) => (e.currentTarget.style.display = "none")}
           />
         )}

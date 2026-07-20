@@ -22,15 +22,17 @@ export default {
         "mint-fill": "rgb(var(--c-mint-fill) / <alpha-value>)",
         surface: "rgb(var(--c-surface) / <alpha-value>)",
         page: "rgb(var(--c-bg) / <alpha-value>)",
+        oncanvas: "rgb(var(--c-oncanvas) / <alpha-value>)",
         accent: "rgb(var(--c-accent) / <alpha-value>)",
         "accent-soft": "rgb(var(--c-accent-soft) / <alpha-value>)",
         line: "rgb(var(--c-line) / <alpha-value>)",
-        // Solid grade colours from the ideal-flashcard spec (white text on top).
+        gap: "rgb(var(--c-gap) / <alpha-value>)",
+        // "Пастель-стикер" grade fills — black text/border on top.
         grade: {
-          again: "#A8512E",
-          hard: "#8A6D2F",
-          good: "#33618C",
-          easy: "#2F7D5B",
+          again: "#FFD6CF",
+          hard: "#FFE9B0",
+          good: "#CFE6FF",
+          easy: "#CDEEDF",
         },
       },
       fontFamily: {
@@ -40,6 +42,10 @@ export default {
       },
       boxShadow: {
         soft: "0 8px 30px -8px rgba(58, 58, 69, 0.12)",
+        // Hard cartoon offset shadows (no blur).
+        toon: "4px 4px 0 #000",
+        "toon-sm": "2px 2px 0 #000",
+        "toon-lg": "6px 6px 0 #000",
       },
       borderRadius: {
         card: "28px",

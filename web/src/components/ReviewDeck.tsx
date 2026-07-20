@@ -68,7 +68,7 @@ export function ReviewDeck({
     <button
       type="button"
       onClick={onUndo}
-      className="rounded-full bg-sky/40 px-4 py-2 text-sm font-medium text-ink shadow-soft dark:bg-sky/20"
+      className="rounded-full border-2 border-black bg-sky px-4 py-2 text-sm font-semibold text-ink shadow-toon-sm"
     >
       ↩︎ {t("undo")}
     </button>
@@ -76,16 +76,16 @@ export function ReviewDeck({
 
   if (!top) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
+      <div className="flex h-full flex-col items-center justify-center gap-3 text-center text-oncanvas">
         <p className="text-2xl">🎉</p>
-        <p className="text-lg font-medium text-ink">{practice ? t("practiceEmpty") : t("emptyTitle")}</p>
-        <p className="max-w-xs text-sm text-muted">{t("emptyHint")}</p>
+        <p className="text-lg font-semibold">{practice ? t("practiceEmpty") : t("emptyTitle")}</p>
+        <p className="max-w-xs text-sm opacity-70">{t("emptyHint")}</p>
         <div className="mt-2 flex items-center gap-3">
           {undoButton}
           <button
             type="button"
             onClick={onStartPractice}
-            className="rounded-full bg-mint/50 px-5 py-2.5 text-sm font-medium text-ink shadow-soft dark:bg-mint/25"
+            className="rounded-full border-2 border-black bg-mint px-5 py-2.5 text-sm font-semibold text-ink shadow-toon-sm"
           >
             📚 {t("studyMore")}
           </button>
@@ -96,7 +96,7 @@ export function ReviewDeck({
 
   return (
     <div className="flex h-full flex-col gap-3">
-      {practice && <p className="text-center text-xs text-muted">{t("practiceNote")}</p>}
+      {practice && <p className="text-center text-xs text-oncanvas opacity-70">{t("practiceNote")}</p>}
 
       <div className="min-h-0 flex-1">
         <SrsCard
@@ -114,7 +114,7 @@ export function ReviewDeck({
           type="button"
           disabled={busy}
           onClick={handleDelete}
-          className="rounded-full bg-blush/40 px-4 py-2 text-sm font-medium text-ink shadow-soft disabled:opacity-50 dark:bg-blush/20"
+          className="rounded-full border-2 border-black bg-blush px-4 py-2 text-sm font-semibold text-ink shadow-toon-sm disabled:opacity-50"
         >
           {t("delete")}
         </button>
@@ -122,7 +122,7 @@ export function ReviewDeck({
           type="button"
           disabled={busy}
           onClick={() => setRegenerating(true)}
-          className="rounded-full bg-butter/50 px-4 py-2 text-sm font-medium text-ink shadow-soft disabled:opacity-50 dark:bg-butter/20"
+          className="rounded-full border-2 border-black bg-butter px-4 py-2 text-sm font-semibold text-ink shadow-toon-sm disabled:opacity-50"
         >
           {t("regenerate")}
         </button>

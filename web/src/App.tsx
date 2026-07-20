@@ -149,11 +149,11 @@ export function App() {
       <TabBar tab={tab} onChange={setTab} />
 
       <main className="min-h-0 flex-1 pb-[max(env(safe-area-inset-bottom),0.5rem)]">
-        {error && <p className="p-4 text-center text-sm text-red-400">{error}</p>}
+        {error && <p className="p-4 text-center text-sm text-red-500">{error}</p>}
 
         {!error && tab === "review" && (
           reviewCards === null ? (
-            <p className="p-8 text-center text-sm text-muted">{t("loading")}</p>
+            <p className="p-8 text-center text-sm text-oncanvas opacity-70">{t("loading")}</p>
           ) : (
             <ReviewDeck
               cards={reviewCards}
@@ -172,7 +172,7 @@ export function App() {
 
         {!error && tab === "library" && (
           allCards === null ? (
-            <p className="p-8 text-center text-sm text-muted">{t("loading")}</p>
+            <p className="p-8 text-center text-sm text-oncanvas opacity-70">{t("loading")}</p>
           ) : (
             <Library cards={allCards} onCardUpdated={handleCardUpdated} onCardDeleted={handleCardDeleted} />
           )
@@ -180,7 +180,7 @@ export function App() {
 
         {!error && tab === "profile" && (
           profile === null ? (
-            <p className="p-8 text-center text-sm text-muted">{t("loading")}</p>
+            <p className="p-8 text-center text-sm text-oncanvas opacity-70">{t("loading")}</p>
           ) : (
             <Profile profile={profile} onUpdate={handleUpdateProfile} />
           )
