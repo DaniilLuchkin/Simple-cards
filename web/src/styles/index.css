@@ -5,13 +5,16 @@
 /* Theme palette as RGB channels so Tailwind opacity modifiers keep working.
    Light: pastel-on-white. Dark: soft navy blues. */
 :root {
-  --c-ink: 58 58 69;
-  --c-muted: 139 139 150;
+  --c-ink: 27 39 51; /* #1B2733 */
+  --c-muted: 92 107 122; /* #5C6B7A */
   --c-sky-fill: 236 245 255;
   --c-lilac-fill: 244 239 255;
   --c-mint-fill: 239 250 246;
-  --c-surface: 255 255 255;
-  --c-bg: 255 255 255;
+  --c-surface: 252 253 254; /* #FCFDFE */
+  --c-bg: 233 237 242; /* #E9EDF2 cool grey so the card pops */
+  --c-accent: 51 97 140; /* #33618C */
+  --c-accent-soft: 220 231 241; /* #DCE7F1 */
+  --c-line: 212 220 228; /* #D4DCE4 */
 }
 
 .dark {
@@ -22,6 +25,9 @@
   --c-mint-fill: 22 37 63;
   --c-surface: 21 32 54;
   --c-bg: 14 21 34;
+  --c-accent: 138 178 224;
+  --c-accent-soft: 38 56 86;
+  --c-line: 54 70 98;
 }
 
 html,

@@ -22,6 +22,16 @@ export default {
         "mint-fill": "rgb(var(--c-mint-fill) / <alpha-value>)",
         surface: "rgb(var(--c-surface) / <alpha-value>)",
         page: "rgb(var(--c-bg) / <alpha-value>)",
+        accent: "rgb(var(--c-accent) / <alpha-value>)",
+        "accent-soft": "rgb(var(--c-accent-soft) / <alpha-value>)",
+        line: "rgb(var(--c-line) / <alpha-value>)",
+        // Solid grade colours from the ideal-flashcard spec (white text on top).
+        grade: {
+          again: "#A8512E",
+          hard: "#8A6D2F",
+          good: "#33618C",
+          easy: "#2F7D5B",
+        },
       },
       fontFamily: {
         sans: ["-apple-system", "BlinkMacSystemFont", "Segoe UI", "Roboto", "sans-serif"],
