@@ -81,6 +81,7 @@ const en = {
   srsCollocations: "Collocations",
   srsYourNote: "Your association",
   srsNotePlaceholder: "Add your own association…",
+  srsNoteHold: "Press & hold to edit",
   srsCardAria: "Flashcard, tap to flip",
   gradeAgain: "Again",
   gradeHard: "Hard",
@@ -116,7 +117,8 @@ const ru: Dict = {
   srsHint: "Показать подсказку", srsFront: "Лицевая сторона", srsBack: "Оборот", srsFlip: "Перевернуть",
   srsListen: "Озвучить", srsWord: "слово", srsPhrase: "фраза",
   srsCollocations: "Сочетания", srsYourNote: "Твоя ассоциация",
-  srsNotePlaceholder: "Добавь свою ассоциацию…", srsCardAria: "Карточка, нажми, чтобы перевернуть",
+  srsNotePlaceholder: "Добавь свою ассоциацию…", srsNoteHold: "Удерживай, чтобы изменить",
+  srsCardAria: "Карточка, нажми, чтобы перевернуть",
   gradeAgain: "Снова", gradeHard: "Трудно", gradeGood: "Хорошо", gradeEasy: "Легко",
   unitLt10m: "<10 мин", unitDay: "д", unitMonth: "мес", unitYear: "г",
 };

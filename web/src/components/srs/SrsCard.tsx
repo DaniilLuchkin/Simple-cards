@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import type { KeyboardEvent, MouseEvent } from "react";
+import type { KeyboardEvent, MouseEvent, PointerEvent } from "react";
 import { usePrefs } from "../../lib/prefs";
 import { speak } from "../../lib/speak";
+import { haptic } from "../../lib/telegram";
 import { GRADES, formatInterval, previewIntervals, schedule } from "../../lib/srs";
 import type { Grade, SrsState } from "../../lib/srs";
 import { splitCloze } from "../../lib/srsCard";
@@ -68,7 +69,9 @@ export function SrsCard({
   const [flipped, setFlipped] = useState(defaultFlipped);
   const [hintStep, setHintStep] = useState(0); // 0 none -> 1 pos -> 2 first letters
   const [note, setNote] = useState(card.personalNote);
+  const [editingNote, setEditingNote] = useState(false);
   const noteRef = useRef(card.personalNote);
+  const holdTimer = useRef<number | null>(null);
 
   const cloze = splitCloze(card.sentence);
   const intervals = previewIntervals(card.srs);
@@ -99,6 +102,23 @@ export function SrsCard({
     if (noteRef.current === note) return;
     noteRef.current = note;
     onNoteChange?.(note);
+  }
+
+  // The note opens for editing only on a deliberate press-and-hold, so a stray
+  // tap while reading the back never focuses it or pops the keyboard.
+  function startHold(e: PointerEvent) {
+    e.stopPropagation();
+    holdTimer.current = window.setTimeout(() => {
+      holdTimer.current = null;
+      setEditingNote(true);
+      haptic("medium");
+    }, 500);
+  }
+  function cancelHold() {
+    if (holdTimer.current !== null) {
+      clearTimeout(holdTimer.current);
+      holdTimer.current = null;
+    }
   }
 
   function grade(g: Grade, e: MouseEvent) {
@@ -146,7 +166,7 @@ export function SrsCard({
               <img
                 src={card.imageUrl}
                 alt=""
-                className="h-28 w-28 rounded-2xl border-2 border-black bg-white object-contain"
+                className="h-44 w-44 rounded-2xl border-2 border-black bg-white object-contain"
                 onError={(e) => (e.currentTarget.style.display = "none")}
               />
             </div>
@@ -248,16 +268,48 @@ export function SrsCard({
           )}
 
           <div className="border-l-[3px] border-black pl-3">
-            <textarea
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              onClick={stop}
-              onKeyDown={(e) => e.stopPropagation()}
-              onBlur={saveNote}
-              rows={2}
-              placeholder={t("srsNotePlaceholder")}
-              className="w-full resize-none bg-transparent text-sm italic text-ink outline-none placeholder:not-italic placeholder:text-muted"
-            />
+            {editingNote ? (
+              <textarea
+                autoFocus
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                onClick={stop}
+                onKeyDown={(e) => e.stopPropagation()}
+                onBlur={() => {
+                  saveNote();
+                  setEditingNote(false);
+                }}
+                rows={2}
+                placeholder={t("srsNotePlaceholder")}
+                className="w-full resize-none bg-transparent text-sm italic text-ink outline-none placeholder:not-italic placeholder:text-muted"
+              />
+            ) : (
+              <div
+                role="button"
+                tabIndex={0}
+                onPointerDown={startHold}
+                onPointerUp={cancelHold}
+                onPointerLeave={cancelHold}
+                onPointerCancel={cancelHold}
+                onClick={stop}
+                onContextMenu={(e) => e.preventDefault()}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setEditingNote(true);
+                  }
+                }}
+                className="cursor-pointer select-none"
+              >
+                <p className={`text-sm italic ${note ? "text-ink" : "text-muted"}`}>
+                  {note || t("srsNotePlaceholder")}
+                </p>
+                <p className="mt-1 flex items-center gap-1 text-[11px] not-italic text-muted">
+                  <span aria-hidden>👆</span> {t("srsNoteHold")}
+                </p>
+              </div>
+            )}
           </div>
 
           <div className="mt-auto grid grid-cols-4 gap-2 pt-1">
