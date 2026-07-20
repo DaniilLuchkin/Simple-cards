@@ -241,14 +241,31 @@ export function SrsCard({
             </div>
           )}
 
-          <div className="flex flex-col items-start gap-3">
-            <button
-              type="button"
-              onClick={cycleHint}
-              className="rounded-full border-2 border-dashed border-black px-4 py-2 text-sm font-semibold text-ink"
-            >
-              {t("srsHint")}
-            </button>
+          <div className={`flex flex-col gap-3 ${card.imageUrl ? "" : "mt-auto"}`}>
+            {/* Hint + audio share one row to leave more height for the image. */}
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={cycleHint}
+                className="rounded-full border-2 border-dashed border-black px-4 py-2 text-sm font-semibold text-ink"
+              >
+                {t("srsHint")}
+              </button>
+              <button
+                type="button"
+                aria-label={t("srsListen")}
+                onClick={(e) => {
+                  stop(e);
+                  speak(cloze.before + card.headword + cloze.after, {
+                    audioUrl: card.audioUrl,
+                    lang: learningLang,
+                  });
+                }}
+                className="flex h-11 w-11 items-center justify-center rounded-full border-2 border-black bg-white text-lg shadow-toon-sm"
+              >
+                🔊
+              </button>
+            </div>
             {hintStep >= 1 && (
               <div className="flex flex-wrap gap-2 text-sm">
                 {card.pos && (
@@ -259,23 +276,6 @@ export function SrsCard({
                 </span>
               </div>
             )}
-          </div>
-
-          <div className={`flex flex-col gap-3 ${card.imageUrl ? "" : "mt-auto"}`}>
-            <button
-              type="button"
-              aria-label={t("srsListen")}
-              onClick={(e) => {
-                stop(e);
-                speak(cloze.before + card.headword + cloze.after, {
-                  audioUrl: card.audioUrl,
-                  lang: learningLang,
-                });
-              }}
-              className="flex h-11 w-11 items-center justify-center self-start rounded-full border-2 border-black bg-white text-lg shadow-toon-sm"
-            >
-              🔊
-            </button>
             {gradeRow()}
           </div>
         </div>
