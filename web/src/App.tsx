@@ -101,6 +101,11 @@ export function App() {
     }
   }
 
+  async function handleGenerateImage(card: Card) {
+    const { card: updated } = await api.generateCardImage(card.id);
+    handleCardUpdated(updated);
+  }
+
   async function handleUndo() {
     if (!undoInfo) return;
     const { card, snapshot, practice } = undoInfo;
@@ -151,7 +156,7 @@ export function App() {
   const reviewCards = practiceCards ?? dueCards;
 
   return (
-    <div className="mx-auto flex h-screen max-w-md flex-col px-4 pt-[max(env(safe-area-inset-top),0.5rem)]">
+    <div className="mx-auto flex h-[100dvh] max-w-md flex-col overflow-hidden px-4 pt-[max(env(safe-area-inset-top),0.5rem)]">
       <TabBar tab={tab} onChange={setTab} />
 
       <main className="min-h-0 flex-1 pb-[max(env(safe-area-inset-bottom),0.5rem)]">
@@ -171,6 +176,7 @@ export function App() {
               onGraded={handleGraded}
               onEdit={handleCardEdited}
               onUploadImage={handleUploadImage}
+              onGenerateImage={handleGenerateImage}
               onCardUpdated={handleCardUpdated}
               onCardDeleted={handleCardDeleted}
             />

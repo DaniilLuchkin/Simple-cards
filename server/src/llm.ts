@@ -169,6 +169,41 @@ export async function regenerateCard(input: {
   return parseGeneratedCard(content);
 }
 
+// Generates a card illustration via an image-capable OpenRouter model. The model
+// returns the image inline as a base64 data URL in the assistant message.
+export async function generateImage(prompt: string): Promise<{ buffer: Buffer; contentType: string }> {
+  const res = await fetch(OPENROUTER_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${env.OPENROUTER_API_KEY}`,
+      "Content-Type": "application/json",
+      "HTTP-Referer": env.MINI_APP_URL,
+      "X-Title": env.OPENROUTER_APP_NAME,
+    },
+    body: JSON.stringify({
+      model: env.OPENROUTER_IMAGE_MODEL,
+      messages: [{ role: "user", content: prompt }],
+      modalities: ["image", "text"],
+    }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`OpenRouter image request failed: ${res.status} ${body}`);
+  }
+
+  const data = (await res.json()) as {
+    choices?: Array<{ message?: { images?: Array<{ image_url?: { url?: string } }> } }>;
+  };
+  const url = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+  if (!url || !url.startsWith("data:")) {
+    throw new Error("OpenRouter response had no image");
+  }
+  const [meta, b64] = url.split(",", 2);
+  const contentType = meta.match(/^data:(.*?);base64$/)?.[1] ?? "image/png";
+  return { buffer: Buffer.from(b64, "base64"), contentType };
+}
+
 async function chatCompletion(messages: ChatMessage[], opts?: { temperature?: number }): Promise<string> {
   const res = await fetch(OPENROUTER_URL, {
     method: "POST",

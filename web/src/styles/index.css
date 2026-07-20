@@ -43,7 +43,10 @@
 html,
 body,
 #root {
-  height: 100%;
+  height: 100dvh;
+  /* Avoid a sliver of body background peeking past the app at the bottom edge
+     on mobile webviews where 100vh overshoots the visible viewport. */
+  overflow: hidden;
 }
 
 body {

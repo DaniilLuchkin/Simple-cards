@@ -19,6 +19,7 @@ export function ReviewDeck({
   onGraded,
   onEdit,
   onUploadImage,
+  onGenerateImage,
   onCardUpdated,
   onCardDeleted,
 }: {
@@ -31,6 +32,7 @@ export function ReviewDeck({
   onGraded: (card: Card, grade: Grade) => void;
   onEdit: (card: Card, patch: Partial<Card>) => void;
   onUploadImage: (card: Card, file: File) => void;
+  onGenerateImage: (card: Card) => Promise<void>;
   onCardUpdated: (card: Card) => void;
   onCardDeleted: (id: string) => void;
 }) {
@@ -108,6 +110,7 @@ export function ReviewDeck({
           onGrade={(grade) => onGraded(top, grade)}
           onEdit={(patch) => onEdit(top, patch)}
           onUploadImage={(file) => onUploadImage(top, file)}
+          onGenerateImage={() => onGenerateImage(top)}
         />
       </div>
 

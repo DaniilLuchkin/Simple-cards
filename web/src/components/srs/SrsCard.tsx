@@ -43,9 +43,8 @@ function usePrefersReducedMotion(): boolean {
   return reduced;
 }
 
-// Deliberate press-and-hold (500ms + haptic) so a stray tap while reading the
-// card never triggers editing / the file picker. Returns handlers to spread on
-// the target element.
+// Deliberate press-and-hold (500ms + haptic). Returns handlers to spread on the
+// target so a stray tap never triggers it.
 function useLongPress(onTrigger: () => void) {
   const timer = useRef<number | null>(null);
   const clear = () => {
@@ -55,8 +54,7 @@ function useLongPress(onTrigger: () => void) {
     }
   };
   return {
-    onPointerDown: (e: PointerEvent) => {
-      e.stopPropagation();
+    onPointerDown: () => {
       clear();
       timer.current = window.setTimeout(() => {
         timer.current = null;
@@ -69,89 +67,6 @@ function useLongPress(onTrigger: () => void) {
     onPointerCancel: clear,
     onContextMenu: (e: MouseEvent) => e.preventDefault(),
   };
-}
-
-// A field that shows `children` normally and swaps to an input on long-press.
-function EditableField({
-  value,
-  onSave,
-  ariaLabel,
-  multiline,
-  inputClass,
-  children,
-}: {
-  value: string;
-  onSave: (v: string) => void;
-  ariaLabel: string;
-  multiline?: boolean;
-  inputClass?: string;
-  children: ReactNode;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(value);
-  const stop = (e: MouseEvent) => e.stopPropagation();
-  const begin = () => {
-    setDraft(value);
-    setEditing(true);
-  };
-  const hold = useLongPress(begin);
-
-  function commit() {
-    setEditing(false);
-    if (draft !== value) onSave(draft);
-  }
-
-  if (editing) {
-    const cls = inputClass ?? "w-full rounded-lg border-2 border-black bg-white px-2 py-1 text-ink outline-none";
-    return multiline ? (
-      <textarea
-        autoFocus
-        rows={2}
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onClick={stop}
-        onKeyDown={(e) => e.stopPropagation()}
-        onBlur={commit}
-        className={`resize-none ${cls}`}
-      />
-    ) : (
-      <input
-        autoFocus
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onClick={stop}
-        onKeyDown={(e) => {
-          e.stopPropagation();
-          if (e.key === "Enter") {
-            e.preventDefault();
-            commit();
-          }
-        }}
-        onBlur={commit}
-        className={cls}
-      />
-    );
-  }
-
-  return (
-    <div
-      role="button"
-      tabIndex={0}
-      aria-label={ariaLabel}
-      {...hold}
-      onClick={stop}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          e.stopPropagation();
-          begin();
-        }
-      }}
-      className="cursor-pointer select-none"
-    >
-      {children}
-    </div>
-  );
 }
 
 // "ПЕРЕВЕРНУТЬ ⟳" control shared by both faces.
@@ -177,6 +92,7 @@ export function SrsCard({
   onGrade,
   onEdit,
   onUploadImage,
+  onGenerateImage,
 }: {
   card: SrsCardData;
   learningLang?: string;
@@ -184,15 +100,16 @@ export function SrsCard({
   onGrade?: (grade: Grade, next: SrsState) => void;
   onEdit?: (patch: Partial<Card>) => void;
   onUploadImage?: (file: File) => void;
+  onGenerateImage?: () => Promise<void> | void;
 }) {
   const { t } = usePrefs();
   const reduceMotion = usePrefersReducedMotion();
   const [flipped, setFlipped] = useState(defaultFlipped);
   const [hintStep, setHintStep] = useState(0); // 0 none -> 1 pos -> 2 first letters
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [editing, setEditing] = useState(false);
+  const suppressClick = useRef(false);
 
   const cloze = splitCloze(card.sentence);
-  const filled = cloze.before + card.headword + cloze.after;
   const intervals = previewIntervals(card.srs);
   const units = {
     lt10m: t("unitLt10m"),
@@ -203,7 +120,10 @@ export function SrsCard({
 
   const toggleFlip = () => setFlipped((f) => !f);
   const stop = (e: MouseEvent) => e.stopPropagation();
-  const imageHold = useLongPress(() => fileRef.current?.click());
+  const editHold = useLongPress(() => {
+    suppressClick.current = true;
+    setEditing(true);
+  });
 
   function onCardKeyDown(e: KeyboardEvent<HTMLDivElement>) {
     if (e.target !== e.currentTarget) return;
@@ -223,12 +143,24 @@ export function SrsCard({
     onGrade?.(g, schedule(card.srs, g));
   }
 
-  // Editing the filled sentence rewrites both the display text and the cloze.
-  const saveSentence = (v: string) => onEdit?.({ example: v, sentence: deriveCloze(v, card.headword) });
+  if (editing) {
+    return (
+      <EditForm
+        card={card}
+        onDone={(patch) => {
+          onEdit?.(patch);
+          setEditing(false);
+        }}
+        onCancel={() => setEditing(false)}
+        onUploadImage={onUploadImage}
+        onGenerateImage={onGenerateImage}
+      />
+    );
+  }
 
   const sectionLabel = "text-xs font-semibold uppercase tracking-wide text-muted";
   const faceBase =
-    "absolute inset-0 flex flex-col gap-5 overflow-y-auto rounded-[18px] border-2 border-black bg-surface p-6 [backface-visibility:hidden]";
+    "absolute inset-0 flex flex-col gap-4 overflow-y-auto rounded-[18px] border-2 border-black bg-surface p-6 [backface-visibility:hidden]";
 
   const gradeRow = () => (
     <div className="grid grid-cols-4 gap-2 pt-1">
@@ -263,24 +195,21 @@ export function SrsCard({
       role="button"
       tabIndex={0}
       aria-label={t("srsCardAria")}
-      onClick={toggleFlip}
+      onClick={() => {
+        if (suppressClick.current) {
+          suppressClick.current = false;
+          return;
+        }
+        toggleFlip();
+      }}
+      onPointerDown={editHold.onPointerDown}
+      onPointerUp={editHold.onPointerUp}
+      onPointerLeave={editHold.onPointerLeave}
+      onPointerCancel={editHold.onPointerCancel}
+      onContextMenu={editHold.onContextMenu}
       onKeyDown={onCardKeyDown}
       className="mx-auto h-[560px] w-full max-w-sm cursor-pointer select-none outline-none [perspective:1200px]"
     >
-      {/* Hidden picker shared by the image slot (front). */}
-      <input
-        ref={fileRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onClick={stop}
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) onUploadImage?.(f);
-          e.currentTarget.value = "";
-        }}
-      />
-
       <div
         className="relative h-full w-full rounded-[18px] shadow-toon [transform-style:preserve-3d]"
         style={{
@@ -292,48 +221,25 @@ export function SrsCard({
         <div className={faceBase}>
           {header(t("srsFront"))}
 
-          <EditableField
-            value={filled}
-            onSave={saveSentence}
-            ariaLabel={t("srsFront")}
-            multiline
-            inputClass="w-full rounded-lg border-2 border-black bg-white p-2 font-serif text-xl text-ink outline-none"
-          >
-            <p className="font-serif text-2xl leading-relaxed text-ink">
-              {cloze.before}
-              <span className="mx-0.5 inline-flex min-w-[3.5rem] items-center justify-center rounded-md border-2 border-black bg-gap px-2 align-baseline text-ink">
-                …
-              </span>
-              {cloze.after}
-            </p>
-          </EditableField>
+          <p className="font-serif text-2xl leading-relaxed text-ink">
+            {cloze.before}
+            <span className="mx-0.5 inline-flex min-w-[3.5rem] items-center justify-center rounded-md border-2 border-black bg-gap px-2 align-baseline text-ink">
+              …
+            </span>
+            {cloze.after}
+          </p>
 
-          {/* Image: natural aspect, long-press to replace. */}
-          <div className="flex justify-center py-1">
-            {card.imageUrl ? (
-              <div {...imageHold} onClick={stop} className="cursor-pointer">
-                <img
-                  src={card.imageUrl}
-                  alt=""
-                  className="mx-auto max-h-72 w-auto max-w-full rounded-2xl border-2 border-black object-contain"
-                  onError={(e) => (e.currentTarget.style.display = "none")}
-                />
-              </div>
-            ) : (
-              <div
-                role="button"
-                tabIndex={0}
-                {...imageHold}
-                onClick={stop}
-                className="flex h-32 w-full max-w-[240px] flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-black bg-white/60 px-3 text-center"
-              >
-                <span className="text-2xl" aria-hidden>
-                  🖼️
-                </span>
-                <span className="text-xs text-muted">{t("srsAddImage")}</span>
-              </div>
-            )}
-          </div>
+          {/* Image takes only the leftover space so audio + grades stay visible. */}
+          {card.imageUrl && (
+            <div className="flex min-h-0 flex-1 items-center justify-center">
+              <img
+                src={card.imageUrl}
+                alt=""
+                className="max-h-full w-auto max-w-full rounded-2xl border-2 border-black object-contain"
+                onError={(e) => (e.currentTarget.style.display = "none")}
+              />
+            </div>
+          )}
 
           <div className="flex flex-col items-start gap-3">
             <button
@@ -348,8 +254,6 @@ export function SrsCard({
                 {card.pos && (
                   <span className="rounded-full border border-black px-3 py-1 text-muted">{card.pos}</span>
                 )}
-                {/* Always reveal at least the first letter so the very first
-                    tap gives a real hint (pos may be empty on legacy cards). */}
                 <span className="rounded-full border border-black px-3 py-1 font-serif text-ink">
                   {card.headword.slice(0, hintStep >= 2 ? Math.min(3, card.headword.length) : 1)}…
                 </span>
@@ -357,7 +261,7 @@ export function SrsCard({
             )}
           </div>
 
-          <div className="mt-auto flex flex-col gap-3">
+          <div className={`flex flex-col gap-3 ${card.imageUrl ? "" : "mt-auto"}`}>
             <button
               type="button"
               aria-label={t("srsListen")}
@@ -377,25 +281,12 @@ export function SrsCard({
         </div>
 
         {/* ---------- BACK ---------- */}
-        <div className={`${faceBase} [transform:rotateY(180deg)] gap-4`}>
+        <div className={`${faceBase} [transform:rotateY(180deg)]`}>
           {header(t("srsBack"))}
 
           <div className="flex flex-wrap items-center gap-3">
-            <EditableField
-              value={card.headword}
-              onSave={(v) => onEdit?.({ word: v })}
-              ariaLabel="headword"
-              inputClass="w-full rounded-lg border-2 border-black bg-white px-2 py-1 font-serif text-2xl text-ink outline-none"
-            >
-              <h2 className="font-serif text-3xl leading-none text-ink">{card.headword}</h2>
-            </EditableField>
-            <EditableField value={card.ipa} onSave={(v) => onEdit?.({ ipa: v })} ariaLabel="IPA">
-              {card.ipa ? (
-                <span className="font-serif text-base italic text-muted">{card.ipa}</span>
-              ) : (
-                <span className="text-sm italic text-muted">＋ IPA</span>
-              )}
-            </EditableField>
+            <h2 className="font-serif text-3xl leading-none text-ink">{card.headword}</h2>
+            {card.ipa && <span className="font-serif text-base italic text-muted">{card.ipa}</span>}
             <button
               type="button"
               aria-label={t("srsListen")}
@@ -410,87 +301,197 @@ export function SrsCard({
           </div>
 
           <div>
-            <EditableField value={card.meaning} onSave={(v) => onEdit?.({ translation: v })} ariaLabel="meaning">
-              <p className="text-lg text-ink">{card.meaning}</p>
-            </EditableField>
-            <EditableField
-              value={card.explanation ?? ""}
-              onSave={(v) => onEdit?.({ explanation: v })}
-              ariaLabel="explanation"
-              multiline
-            >
-              <p className="mt-1 text-sm text-muted">{card.explanation || "＋ explanation"}</p>
-            </EditableField>
+            <p className="text-lg text-ink">{card.meaning}</p>
+            {card.explanation && <p className="mt-1 text-sm text-muted">{card.explanation}</p>}
           </div>
 
-          <div className="flex flex-wrap gap-2 text-sm">
-            <EditableField value={card.pos} onSave={(v) => onEdit?.({ pos: v })} ariaLabel="part of speech">
-              <span className="rounded-full border border-black px-3 py-1 text-ink">{card.pos || "＋ pos"}</span>
-            </EditableField>
-            <EditableField
-              value={card.forms.join(" · ")}
-              onSave={(v) => onEdit?.({ forms: parseList(v) })}
-              ariaLabel="forms"
-            >
-              <span className="rounded-full border border-black px-3 py-1 font-serif text-ink">
-                {card.forms.length > 0 ? card.forms.join(" · ") : "＋ forms"}
-              </span>
-            </EditableField>
-          </div>
+          {(card.pos || card.forms.length > 0) && (
+            <div className="flex flex-wrap gap-2 text-sm">
+              {card.pos && (
+                <span className="rounded-full border border-black px-3 py-1 text-ink">{card.pos}</span>
+              )}
+              {card.forms.length > 0 && (
+                <span className="rounded-full border border-black px-3 py-1 font-serif text-ink">
+                  {card.forms.join(" · ")}
+                </span>
+              )}
+            </div>
+          )}
 
-          <EditableField
-            value={filled}
-            onSave={saveSentence}
-            ariaLabel={t("srsBack")}
-            multiline
-            inputClass="w-full rounded-lg border-2 border-black bg-white p-2 font-serif text-base text-ink outline-none"
-          >
-            <p className="font-serif text-lg leading-relaxed text-ink">
-              {cloze.before}
-              <span className="rounded-md bg-gap px-1 font-semibold text-ink">{card.headword}</span>
-              {cloze.after}
-            </p>
-          </EditableField>
+          <p className="font-serif text-lg leading-relaxed text-ink">
+            {cloze.before}
+            <span className="rounded-md bg-gap px-1 font-semibold text-ink">{card.headword}</span>
+            {cloze.after}
+          </p>
 
-          <EditableField
-            value={card.collocations.join(", ")}
-            onSave={(v) => onEdit?.({ collocations: parseList(v) })}
-            ariaLabel="collocations"
-            multiline
-          >
-            {card.collocations.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {card.collocations.map((c) => (
-                  <span
-                    key={c}
-                    className="rounded-full border border-black bg-sky px-3 py-1.5 text-sm text-ink"
-                  >
-                    {c}
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <span className="text-sm italic text-muted">＋ collocations</span>
-            )}
-          </EditableField>
+          {card.collocations.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {card.collocations.map((c) => (
+                <span key={c} className="rounded-full border border-black bg-sky px-3 py-1.5 text-sm text-ink">
+                  {c}
+                </span>
+              ))}
+            </div>
+          )}
 
-          <div className="border-l-[3px] border-black pl-3">
-            <EditableField
-              value={card.personalNote}
-              onSave={(v) => onEdit?.({ personalNote: v })}
-              ariaLabel={t("srsNotePlaceholder")}
-              multiline
-              inputClass="w-full rounded-lg border-2 border-black bg-white p-2 text-sm italic text-ink outline-none"
-            >
-              <p className={`text-sm italic ${card.personalNote ? "text-ink" : "text-muted"}`}>
-                {card.personalNote || t("srsNotePlaceholder")}
-              </p>
-            </EditableField>
-          </div>
+          {card.personalNote && (
+            <div className="border-l-[3px] border-black pl-3">
+              <p className="text-sm italic text-ink">{card.personalNote}</p>
+            </div>
+          )}
 
           <div className="mt-auto">{gradeRow()}</div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ---------- Edit mode: the whole card becomes a form ----------
+
+function Field({
+  label,
+  value,
+  onChange,
+  multiline,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  multiline?: boolean;
+}) {
+  const cls = "rounded-lg border-2 border-black bg-white px-2 py-1.5 text-sm text-ink outline-none";
+  return (
+    <label className="flex flex-col gap-1 text-left">
+      <span className="text-xs font-semibold text-muted">{label}</span>
+      {multiline ? (
+        <textarea value={value} onChange={(e) => onChange(e.target.value)} rows={2} className={`resize-none ${cls}`} />
+      ) : (
+        <input value={value} onChange={(e) => onChange(e.target.value)} className={cls} />
+      )}
+    </label>
+  );
+}
+
+function EditForm({
+  card,
+  onDone,
+  onCancel,
+  onUploadImage,
+  onGenerateImage,
+}: {
+  card: SrsCardData;
+  onDone: (patch: Partial<Card>) => void;
+  onCancel: () => void;
+  onUploadImage?: (file: File) => void;
+  onGenerateImage?: () => Promise<void> | void;
+}) {
+  const { t } = usePrefs();
+  const c = splitCloze(card.sentence);
+  const [f, setF] = useState({
+    word: card.headword,
+    ipa: card.ipa,
+    pos: card.pos,
+    forms: card.forms.join(", "),
+    translation: card.meaning,
+    explanation: card.explanation ?? "",
+    example: c.before + card.headword + c.after,
+    collocations: card.collocations.join(", "),
+    personalNote: card.personalNote,
+  });
+  const [generating, setGenerating] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const set = (k: keyof typeof f) => (v: string) => setF((prev) => ({ ...prev, [k]: v }));
+
+  function done() {
+    onDone({
+      word: f.word,
+      ipa: f.ipa,
+      pos: f.pos,
+      forms: parseList(f.forms),
+      translation: f.translation,
+      explanation: f.explanation,
+      example: f.example,
+      sentence: deriveCloze(f.example, f.word),
+      collocations: parseList(f.collocations),
+      personalNote: f.personalNote,
+    });
+  }
+
+  async function generate() {
+    setGenerating(true);
+    try {
+      await onGenerateImage?.();
+    } catch (err) {
+      console.error("Failed to generate image", err);
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  const btn = "rounded-xl border-2 border-black bg-white px-3 py-2 text-sm font-semibold text-ink shadow-toon-sm disabled:opacity-50";
+
+  return (
+    <div className="mx-auto flex h-[560px] w-full max-w-sm flex-col overflow-y-auto rounded-[18px] border-2 border-black bg-surface p-5 shadow-toon">
+      <div className="mb-3 flex items-center justify-between">
+        <span className="text-xs font-semibold uppercase tracking-wide text-muted">{t("edit")}</span>
+        <button type="button" onClick={onCancel} className="text-sm font-semibold text-accent">
+          {t("cancel")}
+        </button>
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <Field label={t("fieldWord")} value={f.word} onChange={set("word")} />
+        <Field label={t("fieldIpa")} value={f.ipa} onChange={set("ipa")} />
+        <Field label={t("fieldExample")} value={f.example} onChange={set("example")} multiline />
+        <Field label={t("fieldTranslation")} value={f.translation} onChange={set("translation")} />
+        <Field label={t("fieldExplanation")} value={f.explanation} onChange={set("explanation")} multiline />
+        <Field label={t("fieldPos")} value={f.pos} onChange={set("pos")} />
+        <Field label={t("fieldForms")} value={f.forms} onChange={set("forms")} />
+        <Field label={t("fieldCollocations")} value={f.collocations} onChange={set("collocations")} />
+        <Field label={t("fieldNote")} value={f.personalNote} onChange={set("personalNote")} multiline />
+
+        <div>
+          <p className="mb-1 text-xs font-semibold text-muted">{t("editImage")}</p>
+          {card.imageUrl && (
+            <img
+              src={card.imageUrl}
+              alt=""
+              className="mb-2 max-h-40 w-auto max-w-full rounded-xl border-2 border-black object-contain"
+              onError={(e) => (e.currentTarget.style.display = "none")}
+            />
+          )}
+          <div className="flex gap-2">
+            <button type="button" onClick={() => fileRef.current?.click()} className={btn}>
+              {t("uploadPhoto")}
+            </button>
+            {onGenerateImage && (
+              <button type="button" onClick={generate} disabled={generating} className={btn}>
+                {generating ? t("generating") : t("generatePhoto")}
+              </button>
+            )}
+          </div>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) onUploadImage?.(file);
+              e.currentTarget.value = "";
+            }}
+          />
+        </div>
+      </div>
+
+      <button
+        type="button"
+        onClick={done}
+        className="mt-4 rounded-2xl border-2 border-black bg-mint px-4 py-2.5 text-sm font-semibold text-ink shadow-toon-sm"
+      >
+        {t("save")}
+      </button>
     </div>
   );
 }

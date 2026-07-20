@@ -31,6 +31,8 @@ const schema = z.object({
 
   OPENROUTER_API_KEY: z.string().min(1),
   OPENROUTER_MODEL: z.string().default("openai/gpt-5.6-luna"),
+  // Image-capable model used to generate a card illustration on request.
+  OPENROUTER_IMAGE_MODEL: z.string().default("google/gemini-2.5-flash-image-preview"),
   OPENROUTER_APP_NAME: z.string().default("Simple Cards"),
 
   // UTC hour at which the daily word-of-the-day is sent (9 = 12:00 MSK).

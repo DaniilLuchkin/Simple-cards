@@ -4,6 +4,7 @@ import type { Card } from "@prisma/client";
 import { prisma } from "./db.js";
 import { sm2 } from "./sm2.js";
 import { getProfile, recordReview, regenerateCardWithComment, updateProfile } from "./services.js";
+import { generateImage } from "./llm.js";
 import { gradeSchedule } from "./srsSchedule.js";
 import { LANGUAGE_NAMES } from "./languages.js";
 import { absoluteImageUrl, saveImage } from "./storage.js";
@@ -271,6 +272,37 @@ cardsRouter.post(
     }
   }
 );
+
+// Generate a card illustration with an AI image model, store it, set imageUrl.
+cardsRouter.post("/:id/image/generate", async (req, res) => {
+  const card = await prisma.card.findFirst({
+    where: { id: req.params.id, userId: req.dbUserId! },
+  });
+  if (!card) {
+    res.status(404).json({ error: "Card not found" });
+    return;
+  }
+
+  const prompt = [
+    "A clear, simple, friendly illustration for a vocabulary flashcard.",
+    `Depict the meaning of the word "${card.word}".`,
+    card.example ? `Context: "${card.example}".` : null,
+    card.explanation ? `Meaning: ${card.explanation}.` : null,
+    "Single clear subject, soft pastel colors, no text or letters in the image.",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  try {
+    const { buffer, contentType } = await generateImage(prompt);
+    const imageUrl = await saveImage(buffer, contentType);
+    const updated = await prisma.card.update({ where: { id: card.id }, data: { imageUrl } });
+    res.json({ card: toApiCard(updated) });
+  } catch (err) {
+    console.error("Failed to generate image", err);
+    res.status(502).json({ error: "Failed to generate image" });
+  }
+});
 
 cardsRouter.delete("/:id", async (req, res) => {
   const card = await prisma.card.findFirst({

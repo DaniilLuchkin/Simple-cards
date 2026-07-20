@@ -144,6 +144,8 @@ export const api = {
     }
     return res.json() as Promise<{ card: Card }>;
   },
+  generateCardImage: (id: string) =>
+    request<{ card: Card }>(`/api/cards/${id}/image/generate`, { method: "POST" }),
   getProfile: () => request<{ profile: Profile }>("/api/me"),
   updateProfile: (update: ProfileUpdate) =>
     request<{ profile: Profile }>("/api/me", {
