@@ -27,8 +27,10 @@ export function initTelegram() {
   if (!webApp) return;
   webApp.ready();
   webApp.expand();
-  webApp.setBackgroundColor("#ffffff");
-  webApp.setHeaderColor("#ffffff");
+  // Default to the light lavender canvas; the theme effect in prefs
+  // corrects this to charcoal immediately if dark mode is active.
+  webApp.setBackgroundColor("#eae3f7");
+  webApp.setHeaderColor("#eae3f7");
   // Only the drag handle at the very top should minimize the app; swiping
   // content (cards, lists) must not close it.
   webApp.disableVerticalSwipes?.();

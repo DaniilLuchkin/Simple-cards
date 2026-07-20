@@ -10,7 +10,7 @@
   --c-muted: 92 107 122; /* #5C6B7A secondary on cards */
   --c-surface: 255 255 255; /* white cards, both themes */
   --c-oncanvas: 17 17 17; /* text directly on the page canvas */
-  --c-bg: 239 237 230; /* #EFEDE6 warm grey so white cards pop */
+  --c-bg: 234 227 247; /* #EAE3F7 soft lavender so white cards pop */
 
   --c-gap: 255 217 194; /* #FFD9C2 peach cloze highlight */
   /* kept for incidental fills */
@@ -24,7 +24,7 @@
 
 .dark {
   /* cards stay white; only the canvas goes dark */
-  --c-bg: 14 21 34; /* #0E1522 */
+  --c-bg: 25 25 25; /* #191919 flat charcoal, no blue glow */
   --c-oncanvas: 238 242 249;
 }
 
