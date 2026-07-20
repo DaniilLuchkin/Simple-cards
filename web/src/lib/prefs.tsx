@@ -6,11 +6,27 @@ import type { StringKey } from "./i18n";
 
 export type Theme = "light" | "dark";
 
+// Light-theme canvas colors the user can pick in Profile. Dark theme ignores
+// these (it always uses the fixed slate defined in styles/index.css).
+export type Palette = "lavender" | "mint" | "sky";
+export const PALETTES: { id: Palette; hex: string }[] = [
+  { id: "lavender", hex: "#eae3f7" },
+  { id: "mint", hex: "#dcefe6" },
+  { id: "sky", hex: "#dbe9fb" },
+];
+const PALETTE_HEX: Record<Palette, string> = {
+  lavender: "#eae3f7",
+  mint: "#dcefe6",
+  sky: "#dbe9fb",
+};
+
 type Prefs = {
   theme: Theme;
   uiLang: string;
+  palette: Palette;
   toggleTheme: () => void;
   setUiLang: (lang: string) => void;
+  setPalette: (palette: Palette) => void;
   t: (key: StringKey) => string;
 };
 
@@ -29,15 +45,23 @@ export function PrefsProvider({ children }: { children: ReactNode }) {
     const legacy = localStorage.getItem("lang");
     return legacy && DICTS[legacy] ? legacy : "ru";
   });
+  const [palette, setPaletteState] = useState<Palette>(() => {
+    const saved = localStorage.getItem("palette");
+    return saved === "mint" || saved === "sky" ? saved : "lavender";
+  });
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
+    document.documentElement.dataset.palette = palette;
     localStorage.setItem("theme", theme);
-    const bg = theme === "dark" ? "#3c3d44" : "#eae3f7";
+    localStorage.setItem("palette", palette);
+    // Match the Telegram chrome to the canvas: fixed slate in dark, the chosen
+    // palette in light.
+    const bg = theme === "dark" ? "#3c3d44" : PALETTE_HEX[palette];
     const webApp = getTelegramWebApp();
     webApp?.setBackgroundColor(bg);
     webApp?.setHeaderColor(bg);
-  }, [theme]);
+  }, [theme, palette]);
 
   useEffect(() => {
     localStorage.setItem("uiLang", uiLang);
@@ -50,8 +74,10 @@ export function PrefsProvider({ children }: { children: ReactNode }) {
   const prefs: Prefs = {
     theme,
     uiLang,
+    palette,
     toggleTheme: () => setTheme((v) => (v === "dark" ? "light" : "dark")),
     setUiLang: setUiLangState,
+    setPalette: setPaletteState,
     // Per-key fallback to English so partial translations never show blanks.
     t: (key) => dict[key] ?? BASE_DICT[key],
   };

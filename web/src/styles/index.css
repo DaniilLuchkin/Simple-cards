@@ -10,7 +10,10 @@
   --c-muted: 92 107 122; /* #5C6B7A secondary on cards */
   --c-surface: 255 255 255; /* white cards, both themes */
   --c-oncanvas: 17 17 17; /* text directly on the page canvas */
-  --c-bg: 234 227 247; /* #EAE3F7 soft lavender so white cards pop */
+  /* Light canvas is user-selectable (see [data-palette] below); the chosen
+     color feeds --c-bg only in light mode. Default = lavender #EAE3F7. */
+  --c-light-bg: 234 227 247;
+  --c-bg: var(--c-light-bg);
 
   --c-gap: 255 217 194; /* #FFD9C2 peach cloze highlight */
   /* kept for incidental fills */
@@ -20,6 +23,15 @@
   --c-accent: 17 17 17;
   --c-accent-soft: 207 230 255;
   --c-line: 17 17 17;
+}
+
+/* Light-theme palette choices — override only --c-light-bg. Lavender is the
+   :root default. These never affect dark, which sets --c-bg directly below. */
+:root[data-palette="mint"] {
+  --c-light-bg: 220 239 230; /* #DCEFE6 */
+}
+:root[data-palette="sky"] {
+  --c-light-bg: 219 233 251; /* #DBE9FB */
 }
 
 .dark {

@@ -1,8 +1,15 @@
 import { useState } from "react";
 import type { Profile as ProfileData, ProfileUpdate } from "../lib/api";
-import { usePrefs } from "../lib/prefs";
+import { usePrefs, PALETTES } from "../lib/prefs";
+import type { Palette } from "../lib/prefs";
 import { LanguageSelect } from "./LanguageSelect";
 import { ActivityHeatmap } from "./ActivityHeatmap";
+
+const PALETTE_LABEL: Record<Palette, "bgLavender" | "bgMint" | "bgSky"> = {
+  lavender: "bgLavender",
+  mint: "bgMint",
+  sky: "bgSky",
+};
 
 export function Profile({
   profile,
@@ -11,7 +18,7 @@ export function Profile({
   profile: ProfileData;
   onUpdate: (update: ProfileUpdate) => void;
 }) {
-  const { t, uiLang, setUiLang } = usePrefs();
+  const { t, uiLang, setUiLang, palette, setPalette } = usePrefs();
   const [goal, setGoal] = useState(profile.dailyGoal);
 
   const goalMet = profile.todayCount >= profile.dailyGoal;
@@ -67,6 +74,31 @@ export function Profile({
           >
             +
           </button>
+        </div>
+      </div>
+
+      {/* Light-theme background color */}
+      <div className="rounded-2xl border-2 border-black bg-surface p-4 shadow-toon">
+        <p className="mb-3 text-sm text-ink">{t("bgColor")}</p>
+        <div className="flex gap-3">
+          {PALETTES.map((p) => {
+            const active = p.id === palette;
+            return (
+              <button
+                key={p.id}
+                type="button"
+                aria-label={t(PALETTE_LABEL[p.id])}
+                aria-pressed={active}
+                onClick={() => setPalette(p.id)}
+                style={{ backgroundColor: p.hex }}
+                className={`h-11 w-11 rounded-xl border-2 border-black transition ${
+                  active ? "ring-2 ring-black ring-offset-2 ring-offset-surface" : ""
+                }`}
+              >
+                {active && <span className="text-sm font-bold text-ink">✓</span>}
+              </button>
+            );
+          })}
         </div>
       </div>
 
