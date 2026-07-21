@@ -56,6 +56,14 @@ body {
   overscroll-behavior: none;
 }
 
+/* Inputs always sit on white surfaces, so pin the typing caret to the dark ink
+   color - otherwise some webviews (esp. Telegram in light theme) tint it a
+   near-invisible light accent. */
+input,
+textarea {
+  caret-color: rgb(var(--c-ink));
+}
+
 /* Native-app feel: hide scrollbar chrome everywhere so no scrollbar "полоса"
    ever shows at the edge of a scroll area (scrolling itself still works). */
 * {

@@ -4,7 +4,6 @@ import { api } from "../lib/api";
 import { usePrefs } from "../lib/prefs";
 import { SrsCard } from "./srs/SrsCard";
 import { toSrsCard } from "../lib/srsAdapter";
-import { RegenerateModal } from "./RegenerateModal";
 
 // Opening a card from "My cards" shows the same ideal flashcard as during
 // review (flip, long-press edit, image upload/generate, grade buttons), plus
@@ -23,7 +22,6 @@ export function CardDetail({
   onDeleted: (cardId: string) => void;
 }) {
   const { t } = usePrefs();
-  const [regenerating, setRegenerating] = useState(false);
   const [busy, setBusy] = useState(false);
 
   function handleEdit(patch: Partial<Card>) {
@@ -67,16 +65,16 @@ export function CardDetail({
     }
   }
 
-  async function handleRegenerate(comment: string) {
+  async function handleRegenerate() {
+    if (busy) return;
     setBusy(true);
     try {
-      const { card: updated } = await api.regenerateCard(card.id, comment);
+      const { card: updated } = await api.regenerateCard(card.id);
       onUpdated(updated);
     } catch (err) {
       console.error("Failed to regenerate card", err);
     } finally {
       setBusy(false);
-      setRegenerating(false);
     }
   }
 
@@ -112,16 +110,12 @@ export function CardDetail({
         <button
           type="button"
           disabled={busy}
-          onClick={() => setRegenerating(true)}
+          onClick={handleRegenerate}
           className="rounded-full border-2 border-black bg-butter px-5 py-2.5 text-sm font-semibold text-ink shadow-toon-sm disabled:opacity-50"
         >
-          {t("regenerate")}
+          {busy ? t("generating") : t("regenerate")}
         </button>
       </div>
-
-      {regenerating && (
-        <RegenerateModal busy={busy} onCancel={() => setRegenerating(false)} onSubmit={handleRegenerate} />
-      )}
     </div>
   );
 }

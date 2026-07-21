@@ -129,10 +129,11 @@ export const api = {
       body: JSON.stringify(snapshot),
     }),
   deleteCard: (id: string) => request<void>(`/api/cards/${id}`, { method: "DELETE" }),
-  regenerateCard: (id: string, comment: string) =>
+  // Comment is optional - with none, the server regenerates a fresh alternative.
+  regenerateCard: (id: string, comment?: string) =>
     request<{ card: Card }>(`/api/cards/${id}/regenerate`, {
       method: "POST",
-      body: JSON.stringify({ comment }),
+      body: JSON.stringify(comment ? { comment } : {}),
     }),
   updateCard: (
     id: string,

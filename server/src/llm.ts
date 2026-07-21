@@ -199,9 +199,13 @@ export async function generateCardSet(
 export async function regenerateCard(input: {
   headword: string;
   previous: GeneratedCardFields;
-  userComment: string;
+  userComment?: string;
   languages: Languages;
 }): Promise<GeneratedCardFields> {
+  const comment = input.userComment?.trim();
+  const instruction = comment
+    ? `The user wants the card regenerated with this feedback: ${comment}`
+    : "Regenerate this card: produce a fresh alternative for the same word with a different example sentence and phrasing.";
   const content = await chatCompletion([
     { role: "system", content: cardSystemPrompt(input.languages) },
     {
@@ -209,7 +213,7 @@ export async function regenerateCard(input: {
       content: [
         `Word or phrase: ${input.headword}`,
         `Previous card: ${JSON.stringify(input.previous)}`,
-        `The user wants the card regenerated with this feedback: ${input.userComment}`,
+        instruction,
         "Produce an improved card following the same rules and JSON format.",
       ].join("\n"),
     },

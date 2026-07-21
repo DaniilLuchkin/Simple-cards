@@ -222,7 +222,7 @@ export async function createCardFromImage(input: { userId: string; imagePath: st
 export async function regenerateCardWithComment(input: {
   cardId: string;
   userId: string;
-  comment: string;
+  comment?: string;
 }) {
   const card = await prisma.card.findFirstOrThrow({
     where: { id: input.cardId, userId: input.userId },

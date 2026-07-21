@@ -4,7 +4,6 @@ import { api } from "../lib/api";
 import { usePrefs } from "../lib/prefs";
 import { toSrsCard } from "../lib/srsAdapter";
 import { SrsCard } from "./srs/SrsCard";
-import { RegenerateModal } from "./RegenerateModal";
 
 // One-at-a-time SRS review. The top card is graded (Again/Hard/Good/Easy);
 // grading advances to the next due card. Management actions (undo, delete,
@@ -37,7 +36,6 @@ export function ReviewDeck({
   onCardDeleted: (id: string) => void;
 }) {
   const { t } = usePrefs();
-  const [regenerating, setRegenerating] = useState(false);
   const [busy, setBusy] = useState(false);
   const top = cards[0];
 
@@ -54,17 +52,16 @@ export function ReviewDeck({
     }
   }
 
-  async function handleRegenerate(comment: string) {
-    if (!top) return;
+  async function handleRegenerate() {
+    if (!top || busy) return;
     setBusy(true);
     try {
-      const { card } = await api.regenerateCard(top.id, comment);
+      const { card } = await api.regenerateCard(top.id);
       onCardUpdated(card);
     } catch (err) {
       console.error("Failed to regenerate card", err);
     } finally {
       setBusy(false);
-      setRegenerating(false);
     }
   }
 
@@ -127,16 +124,12 @@ export function ReviewDeck({
         <button
           type="button"
           disabled={busy}
-          onClick={() => setRegenerating(true)}
+          onClick={handleRegenerate}
           className="rounded-full border-2 border-black bg-butter px-4 py-2 text-sm font-semibold text-ink shadow-toon-sm disabled:opacity-50"
         >
-          {t("regenerate")}
+          {busy ? t("generating") : t("regenerate")}
         </button>
       </div>
-
-      {regenerating && (
-        <RegenerateModal busy={busy} onCancel={() => setRegenerating(false)} onSubmit={handleRegenerate} />
-      )}
     </div>
   );
 }

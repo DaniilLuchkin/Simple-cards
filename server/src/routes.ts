@@ -230,8 +230,9 @@ cardsRouter.post("/:id/review/undo", async (req, res) => {
   res.json({ card: toApiCard(updated) });
 });
 
+// Comment is optional: with no comment we just regenerate a fresh alternative.
 const regenerateSchema = z.object({
-  comment: z.string().min(1).max(500),
+  comment: z.string().max(500).optional(),
 });
 
 cardsRouter.post("/:id/regenerate", async (req, res) => {
