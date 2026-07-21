@@ -56,7 +56,19 @@ body {
   overscroll-behavior: none;
 }
 
-/* Scrollable without a visible scrollbar (e.g. the horizontal tab row). */
+/* Native-app feel: hide scrollbar chrome everywhere so no scrollbar "полоса"
+   ever shows at the edge of a scroll area (scrolling itself still works). */
+* {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* old Edge/IE */
+}
+*::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none; /* WebKit/Blink */
+}
+
+/* Kept for explicit intent at call sites; the global rule already covers it. */
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
