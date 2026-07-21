@@ -242,15 +242,32 @@ export function SrsCard({
           )}
 
           <div className={`flex flex-col gap-3 ${card.imageUrl ? "" : "mt-auto"}`}>
-            {/* Hint + audio share one row to leave more height for the image. */}
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={cycleHint}
-                className="rounded-full border-2 border-dashed border-black px-4 py-2 text-sm font-semibold text-ink"
-              >
-                {t("srsHint")}
-              </button>
+            {/* Hint on the left (the hint itself replaces the button in place, so
+                the row keeps its height and never resizes the image); audio
+                pinned to the right. */}
+            <div className="flex items-center justify-between gap-3">
+              {hintStep === 0 ? (
+                <button
+                  type="button"
+                  onClick={cycleHint}
+                  className="rounded-full border-2 border-dashed border-black px-4 py-2 text-sm font-semibold text-ink"
+                >
+                  {t("srsHint")}
+                </button>
+              ) : (
+                <div
+                  role="button"
+                  onClick={cycleHint}
+                  className="flex cursor-pointer select-none flex-wrap items-center gap-2 text-sm"
+                >
+                  {card.pos && (
+                    <span className="rounded-full border border-black px-3 py-1 text-muted">{card.pos}</span>
+                  )}
+                  <span className="rounded-full border border-black px-3 py-1 font-serif text-ink">
+                    {card.headword.slice(0, hintStep >= 2 ? Math.min(3, card.headword.length) : 1)}…
+                  </span>
+                </div>
+              )}
               <button
                 type="button"
                 aria-label={t("srsListen")}
@@ -261,21 +278,11 @@ export function SrsCard({
                     lang: learningLang,
                   });
                 }}
-                className="flex h-11 w-11 items-center justify-center rounded-full border-2 border-black bg-white text-lg shadow-toon-sm"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 border-black bg-white text-lg shadow-toon-sm"
               >
                 🔊
               </button>
             </div>
-            {hintStep >= 1 && (
-              <div className="flex flex-wrap gap-2 text-sm">
-                {card.pos && (
-                  <span className="rounded-full border border-black px-3 py-1 text-muted">{card.pos}</span>
-                )}
-                <span className="rounded-full border border-black px-3 py-1 font-serif text-ink">
-                  {card.headword.slice(0, hintStep >= 2 ? Math.min(3, card.headword.length) : 1)}…
-                </span>
-              </div>
-            )}
             {gradeRow()}
           </div>
         </div>
