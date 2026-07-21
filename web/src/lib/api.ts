@@ -45,6 +45,30 @@ export type Sm2Snapshot = Pick<
   "easeFactor" | "interval" | "repetitions" | "lapses" | "dueAt" | "lastReviewedAt"
 >;
 
+// Raw generated card fields, produced server-side and echoed back verbatim when
+// the user saves an AI-set preview.
+export type GeneratedFields = {
+  headword: string;
+  ipa: string;
+  pos: string;
+  forms: string[];
+  sentence: string;
+  explanation: string;
+  translation: string;
+  collocations: string[];
+};
+
+// A generated-but-not-saved card shown in the AI tab for the user to keep or
+// discard. `fields` + `imageUrl` are sent back on save.
+export type CardPreview = {
+  id: string;
+  word: string;
+  translation: string;
+  example: string;
+  imageUrl: string | null;
+  fields: GeneratedFields;
+};
+
 export type Profile = {
   learningLanguage: string;
   translationLanguage: string;
@@ -178,11 +202,18 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ text, from, to }),
     }),
-  // Generate a themed batch of cards from a natural-language request.
+  // Generate a themed batch of card previews (each with an image) from a
+  // natural-language request. Nothing is saved until saveCardSet.
   generateCardSet: (request_: string) =>
-    request<{ cards: Card[] }>("/api/cards/generate-set", {
+    request<{ previews: CardPreview[] }>("/api/cards/generate-set", {
       method: "POST",
       body: JSON.stringify({ request: request_ }),
+    }),
+  // Persist the previews the user chose to keep.
+  saveCardSet: (cards: { fields: GeneratedFields; imageUrl: string | null }[]) =>
+    request<{ cards: Card[] }>("/api/cards/generate-set/save", {
+      method: "POST",
+      body: JSON.stringify({ cards }),
     }),
   getProfile: () => request<{ profile: Profile }>("/api/me"),
   updateProfile: (update: ProfileUpdate) =>

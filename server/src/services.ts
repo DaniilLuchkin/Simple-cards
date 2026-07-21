@@ -5,12 +5,13 @@ import {
   generateCard,
   generateCardFromImage,
   generateCardSet,
+  generateImage,
   regenerateCard,
 } from "./llm.js";
 import type { GeneratedCardFields } from "./llm.js";
 import { languageNames } from "./languages.js";
 import type { Languages } from "./languages.js";
-import { absoluteImageUrl } from "./storage.js";
+import { absoluteImageUrl, saveImage } from "./storage.js";
 
 // Maps generated fields onto the Card columns. `word`/`example` mirror
 // `headword`/filled-sentence for the library preview and legacy compatibility.
@@ -93,21 +94,103 @@ export function createCardFromFields(input: { userId: string; fields: GeneratedC
   });
 }
 
-// Generates a themed batch of cards from a free-text request and persists them.
-export async function createCardSetFromRequest(input: {
+// Builds the illustration prompt for a card. Kept in one place so both the
+// on-demand "generate image" route and the AI-set preview use the same wording:
+// depict the meaning, never render any text.
+function cardImagePrompt(card: {
+  word: string;
+  example?: string | null;
+  explanation?: string | null;
+}): string {
+  return [
+    "A clean, friendly illustration for a vocabulary flashcard — a purely visual, wordless picture.",
+    `It should clearly show the meaning of the word "${card.word}" so someone can guess the word just by looking.`,
+    card.explanation ? `Meaning: ${card.explanation}.` : null,
+    card.example ? `Scene/context: "${card.example}".` : null,
+    "One clear main subject, soft pastel colors, simple uncluttered background, flat modern illustration style.",
+    "Absolutely NO text of any kind: no letters, words, numbers, captions, labels, signs, speech bubbles, logos or watermarks anywhere in the image.",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+// Generates an illustration for a card and stores it, returning the relative
+// image path (see storage.saveImage).
+export async function generateCardImageFile(card: {
+  word: string;
+  example?: string | null;
+  explanation?: string | null;
+}): Promise<string> {
+  const { buffer, contentType } = await generateImage(cardImagePrompt(card));
+  return saveImage(buffer, contentType);
+}
+
+// Runs `fn` over `items` with at most `limit` in flight at once (image
+// generation is slow/rate-limited, so we don't fire 30 requests at once).
+async function mapPool<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let cursor = 0;
+  async function worker() {
+    while (cursor < items.length) {
+      const index = cursor++;
+      results[index] = await fn(items[index]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
+// A generated-but-not-yet-saved card the user can accept or discard in the AI
+// tab. Carries the raw fields (echoed back on save) plus display helpers.
+export type CardSetPreview = {
+  word: string;
+  translation: string;
+  example: string;
+  imagePath: string | null;
+  fields: GeneratedCardFields;
+};
+
+// Generates a themed batch of cards from a free-text request WITH an image each,
+// but does NOT persist them - the user picks which to keep in the AI tab.
+export async function generateCardSetPreview(input: {
   userId: string;
   request: string;
   max?: number;
-}) {
+}): Promise<CardSetPreview[]> {
   const max = Math.min(input.max ?? 30, 30);
   const [languages, existing] = await Promise.all([
     userLanguages(input.userId),
     listUserWords(input.userId),
   ]);
   const fieldsList = await generateCardSet(input.request, languages, existing, max);
+
+  return mapPool(fieldsList, 4, async (fields) => {
+    const example = filledSentence(fields);
+    let imagePath: string | null = null;
+    try {
+      imagePath = await generateCardImageFile({
+        word: fields.headword,
+        example,
+        explanation: fields.explanation,
+      });
+    } catch (err) {
+      // A failed image shouldn't drop the card - it just shows without one.
+      console.error("Preview image generation failed", err);
+    }
+    return { word: fields.headword, translation: fields.translation, example, imagePath, fields };
+  });
+}
+
+// Persists the cards the user chose to keep from an AI-set preview.
+export async function saveGeneratedCards(input: {
+  userId: string;
+  cards: { fields: GeneratedCardFields; imagePath: string | null }[];
+}) {
   return Promise.all(
-    fieldsList.map((fields) =>
-      prisma.card.create({ data: { userId: input.userId, ...cardColumns(fields) } })
+    input.cards.map((c) =>
+      prisma.card.create({
+        data: { userId: input.userId, ...cardColumns(c.fields), imageUrl: c.imagePath },
+      })
     )
   );
 }

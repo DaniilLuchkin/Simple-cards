@@ -3,16 +3,20 @@ import { z } from "zod";
 import type { Card } from "@prisma/client";
 import { prisma } from "./db.js";
 import { sm2 } from "./sm2.js";
+import { randomUUID } from "node:crypto";
 import {
   createCard,
   createCardFromImage,
-  createCardSetFromRequest,
+  generateCardImageFile,
+  generateCardSetPreview,
+  saveGeneratedCards,
   getProfile,
   recordReview,
   regenerateCardWithComment,
   updateProfile,
 } from "./services.js";
-import { generateImage, translateText } from "./llm.js";
+import type { GeneratedCardFields } from "./llm.js";
+import { translateText } from "./llm.js";
 import { gradeSchedule } from "./srsSchedule.js";
 import { LANGUAGE_NAMES, languageName } from "./languages.js";
 import { absoluteImageUrl, saveImage } from "./storage.js";
@@ -275,7 +279,9 @@ cardsRouter.post("/", async (req, res) => {
   }
 });
 
-// Generate a themed batch of cards from a natural-language request.
+// Generate a themed batch of cards (each with an illustration) from a
+// natural-language request. Returns previews only - nothing is saved yet; the
+// user picks which to keep and POSTs them to /generate-set/save.
 const generateSetSchema = z.object({ request: z.string().min(1).max(500) });
 
 cardsRouter.post("/generate-set", async (req, res) => {
@@ -285,18 +291,84 @@ cardsRouter.post("/generate-set", async (req, res) => {
     return;
   }
   try {
-    const cards = await createCardSetFromRequest({
+    const previews = await generateCardSetPreview({
       userId: req.dbUserId!,
       request: parsed.data.request,
     });
-    if (!cards.length) {
+    if (!previews.length) {
       res.status(502).json({ error: "No cards generated" });
       return;
     }
-    res.status(201).json({ cards: cards.map(toApiCard) });
+    res.status(201).json({
+      previews: previews.map((p) => ({
+        id: randomUUID(),
+        word: p.word,
+        translation: p.translation,
+        example: p.example,
+        imageUrl: absoluteImageUrl(p.imagePath),
+        fields: p.fields,
+      })),
+    });
   } catch (err) {
     console.error("Failed to generate card set", err);
     res.status(502).json({ error: "Failed to generate cards" });
+  }
+});
+
+// Persist the subset of an AI-set preview the user chose to keep. The client
+// echoes back the generated fields + the image URL we returned.
+const generatedFieldsSchema = z.object({
+  headword: z.string().min(1).max(200),
+  ipa: z.string().max(100),
+  pos: z.string().max(100),
+  forms: z.array(z.string().max(100)).max(20),
+  sentence: z.string().max(500),
+  explanation: z.string().max(1000),
+  translation: z.string().max(300),
+  collocations: z.array(z.string().max(200)).max(20),
+});
+const saveSetSchema = z.object({
+  cards: z
+    .array(
+      z.object({
+        fields: generatedFieldsSchema,
+        imageUrl: z.string().max(2000).nullable().optional(),
+      })
+    )
+    .min(1)
+    .max(30),
+});
+
+// Turns the absolute image URL we handed the client back into the relative path
+// stored in the DB (mirrors absoluteImageUrl's legacy handling); ignores junk.
+function imagePathFromUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    const pathname = url.startsWith("http") ? new URL(url).pathname : url;
+    return pathname.startsWith("/uploads/") ? pathname : null;
+  } catch {
+    return null;
+  }
+}
+
+cardsRouter.post("/generate-set/save", async (req, res) => {
+  const parsed = saveSetSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten() });
+    return;
+  }
+  try {
+    const cards = await saveGeneratedCards({
+      userId: req.dbUserId!,
+      cards: parsed.data.cards.map((c) => ({
+        fields: c.fields as GeneratedCardFields,
+        imagePath: imagePathFromUrl(c.imageUrl),
+      })),
+    });
+    res.status(201).json({ cards: cards.map(toApiCard) });
+  } catch (err) {
+    console.error("Failed to save card set", err);
+    res.status(500).json({ error: "Failed to save cards" });
   }
 });
 
@@ -409,20 +481,8 @@ cardsRouter.post("/:id/image/generate", async (req, res) => {
     return;
   }
 
-  const prompt = [
-    "A clean, friendly illustration for a vocabulary flashcard — a purely visual, wordless picture.",
-    `It should clearly show the meaning of the word "${card.word}" so someone can guess the word just by looking.`,
-    card.explanation ? `Meaning: ${card.explanation}.` : null,
-    card.example ? `Scene/context: "${card.example}".` : null,
-    "One clear main subject, soft pastel colors, simple uncluttered background, flat modern illustration style.",
-    "Absolutely NO text of any kind: no letters, words, numbers, captions, labels, signs, speech bubbles, logos or watermarks anywhere in the image.",
-  ]
-    .filter(Boolean)
-    .join(" ");
-
   try {
-    const { buffer, contentType } = await generateImage(prompt);
-    const imageUrl = await saveImage(buffer, contentType);
+    const imageUrl = await generateCardImageFile(card);
     const updated = await prisma.card.update({ where: { id: card.id }, data: { imageUrl } });
     res.json({ card: toApiCard(updated) });
   } catch (err) {

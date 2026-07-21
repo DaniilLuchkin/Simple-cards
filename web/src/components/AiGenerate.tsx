@@ -1,16 +1,20 @@
 import { useState } from "react";
-import type { Card } from "../lib/api";
+import type { Card, CardPreview } from "../lib/api";
 import { api } from "../lib/api";
 import { usePrefs } from "../lib/prefs";
 
-// AI tab: describe a set of cards in natural language and generate a themed
-// batch of ideal flashcards in one go.
+// AI tab: describe a set of cards in natural language, generate a themed batch
+// of ideal flashcards (each with an illustration), then pick which to keep
+// before adding them to the deck.
 export function AiGenerate({ onCreated }: { onCreated: (cards: Card[]) => void }) {
   const { t } = usePrefs();
   const [request, setRequest] = useState("");
   const [busy, setBusy] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [created, setCreated] = useState<Card[] | null>(null);
+  const [previews, setPreviews] = useState<CardPreview[] | null>(null);
+  const [checked, setChecked] = useState<Set<string>>(new Set());
+  const [addedCount, setAddedCount] = useState<number | null>(null);
 
   const examples = [t("aiExample1"), t("aiExample2"), t("aiExample3")];
 
@@ -19,11 +23,12 @@ export function AiGenerate({ onCreated }: { onCreated: (cards: Card[]) => void }
     if (!text || busy) return;
     setBusy(true);
     setError(null);
-    setCreated(null);
+    setPreviews(null);
+    setAddedCount(null);
     try {
-      const { cards } = await api.generateCardSet(text);
-      setCreated(cards);
-      onCreated(cards);
+      const { previews: p } = await api.generateCardSet(text);
+      setPreviews(p);
+      setChecked(new Set(p.map((c) => c.id))); // all selected by default
     } catch {
       setError(t("aiFailed"));
     } finally {
@@ -31,8 +36,44 @@ export function AiGenerate({ onCreated }: { onCreated: (cards: Card[]) => void }
     }
   }
 
+  function toggle(id: string) {
+    setChecked((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAll() {
+    if (!previews) return;
+    setChecked((prev) => (prev.size === previews.length ? new Set() : new Set(previews.map((c) => c.id))));
+  }
+
+  async function addSelected() {
+    if (!previews || saving) return;
+    const chosen = previews.filter((c) => checked.has(c.id));
+    if (!chosen.length) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const { cards } = await api.saveCardSet(
+        chosen.map((c) => ({ fields: c.fields, imageUrl: c.imageUrl }))
+      );
+      onCreated(cards);
+      setPreviews(null);
+      setChecked(new Set());
+      setAddedCount(cards.length);
+    } catch {
+      setError(t("aiSaveFailed"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const allSelected = previews != null && checked.size === previews.length;
+
   return (
-    <div className="flex h-full flex-col gap-3 overflow-y-auto pb-6 pt-1">
+    <div className="flex h-full flex-col gap-3 pt-1">
       <textarea
         value={request}
         onChange={(e) => setRequest(e.target.value)}
@@ -41,18 +82,20 @@ export function AiGenerate({ onCreated }: { onCreated: (cards: Card[]) => void }
         className="resize-none rounded-2xl border-2 border-black bg-surface p-3 text-base text-ink shadow-toon outline-none placeholder:text-muted"
       />
 
-      <div className="flex flex-wrap gap-2">
-        {examples.map((ex) => (
-          <button
-            key={ex}
-            type="button"
-            onClick={() => setRequest(ex)}
-            className="rounded-full border-2 border-dashed border-black px-3 py-1 text-xs font-semibold text-ink"
-          >
-            {ex}
-          </button>
-        ))}
-      </div>
+      {!previews && (
+        <div className="flex flex-wrap gap-2">
+          {examples.map((ex) => (
+            <button
+              key={ex}
+              type="button"
+              onClick={() => setRequest(ex)}
+              className="rounded-full border-2 border-dashed border-black px-3 py-1 text-xs font-semibold text-ink"
+            >
+              {ex}
+            </button>
+          ))}
+        </div>
+      )}
 
       <button
         type="button"
@@ -65,23 +108,71 @@ export function AiGenerate({ onCreated }: { onCreated: (cards: Card[]) => void }
 
       {error && <p className="text-center text-sm font-semibold text-red-500">{error}</p>}
 
-      {created && (
-        <div className="flex min-h-0 flex-1 flex-col gap-2">
-          <p className="text-sm font-semibold text-oncanvas">
-            ✓ {created.length} {t("aiCreated")}
-          </p>
-          <div className="flex flex-col gap-2">
-            {created.map((c) => (
-              <div
-                key={c.id}
-                className="rounded-2xl border-2 border-black bg-surface px-4 py-2 shadow-toon-sm"
-              >
-                <p className="text-base font-semibold text-ink">{c.word}</p>
-                <p className="truncate text-sm text-muted">{c.translation}</p>
-              </div>
-            ))}
+      {addedCount != null && (
+        <p className="text-center text-sm font-semibold text-emerald-600">
+          ✓ {addedCount} {t("aiCreated")}
+        </p>
+      )}
+
+      {previews && (
+        <>
+          <div className="flex items-center justify-between px-1 text-oncanvas">
+            <span className="text-xs opacity-70">{t("aiReview")}</span>
+            <button
+              type="button"
+              onClick={toggleAll}
+              className="rounded-full border-2 border-black bg-white px-3 py-1 text-xs font-semibold text-ink shadow-toon-sm"
+            >
+              {allSelected ? t("aiClearSel") : t("aiSelectAll")}
+            </button>
           </div>
-        </div>
+
+          <div className="-mx-2 flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-2 pb-2">
+            {previews.map((c) => {
+              const isChecked = checked.has(c.id);
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => toggle(c.id)}
+                  aria-pressed={isChecked}
+                  className={`flex w-full items-center gap-3 rounded-2xl border-2 border-black p-3 text-left shadow-toon-sm transition ${
+                    isChecked ? "bg-surface" : "bg-surface/60 opacity-60"
+                  }`}
+                >
+                  <span
+                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-black ${
+                      isChecked ? "bg-emerald-400 text-ink" : "bg-white text-transparent"
+                    }`}
+                  >
+                    ✓
+                  </span>
+                  {c.imageUrl && (
+                    <img
+                      src={c.imageUrl}
+                      alt=""
+                      className="h-14 w-14 shrink-0 rounded-xl border-2 border-black object-cover"
+                      onError={(e) => (e.currentTarget.style.display = "none")}
+                    />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-base font-semibold text-ink">{c.word}</p>
+                    <p className="truncate text-sm text-muted">{c.translation}</p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          <button
+            type="button"
+            disabled={saving || checked.size === 0}
+            onClick={addSelected}
+            className="rounded-2xl border-2 border-black bg-sky px-4 py-3 text-sm font-semibold text-ink shadow-toon-sm disabled:opacity-50"
+          >
+            {saving ? t("aiAdding") : `${t("aiAddSelected")} (${checked.size})`}
+          </button>
+        </>
       )}
     </div>
   );
