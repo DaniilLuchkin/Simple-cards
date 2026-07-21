@@ -1,43 +1,57 @@
 import { useState } from "react";
-import type { Card } from "../lib/api";
+import type { Card, Grade } from "../lib/api";
 import { api } from "../lib/api";
 import { usePrefs } from "../lib/prefs";
-import { FlipCard } from "./CardView";
+import { SrsCard } from "./srs/SrsCard";
+import { toSrsCard } from "../lib/srsAdapter";
 import { RegenerateModal } from "./RegenerateModal";
 
+// Opening a card from "My cards" shows the same ideal flashcard as during
+// review (flip, long-press edit, image upload/generate, grade buttons), plus
+// delete/regenerate actions.
 export function CardDetail({
   card,
+  learningLang,
   onClose,
   onUpdated,
   onDeleted,
 }: {
   card: Card;
+  learningLang: string;
   onClose: () => void;
   onUpdated: (card: Card) => void;
   onDeleted: (cardId: string) => void;
 }) {
   const { t } = usePrefs();
-  const [flipped, setFlipped] = useState(false);
-  const [editing, setEditing] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [form, setForm] = useState({
-    word: card.word,
-    example: card.example,
-    explanation: card.explanation,
-    translation: card.translation,
-  });
 
-  async function handleSave() {
-    setBusy(true);
+  function handleEdit(patch: Partial<Card>) {
+    onUpdated({ ...card, ...patch });
+    api.updateCard(card.id, patch).catch((err) => console.error("Failed to save edit", err));
+  }
+
+  async function handleUploadImage(file: File) {
     try {
-      const { card: updated } = await api.updateCard(card.id, form);
+      const { card: updated } = await api.uploadCardImage(card.id, file);
       onUpdated(updated);
-      setEditing(false);
     } catch (err) {
-      console.error("Failed to update card", err);
-    } finally {
-      setBusy(false);
+      console.error("Failed to upload image", err);
+    }
+  }
+
+  async function handleGenerateImage() {
+    const { card: updated } = await api.generateCardImage(card.id);
+    onUpdated(updated);
+  }
+
+  async function handleGrade(grade: Grade) {
+    try {
+      const { card: updated } = await api.gradeCard(card.id, grade);
+      onUpdated(updated);
+      onClose();
+    } catch (err) {
+      console.error("Failed to grade card", err);
     }
   }
 
@@ -58,12 +72,6 @@ export function CardDetail({
     try {
       const { card: updated } = await api.regenerateCard(card.id, comment);
       onUpdated(updated);
-      setForm({
-        word: updated.word,
-        example: updated.example,
-        explanation: updated.explanation,
-        translation: updated.translation,
-      });
     } catch (err) {
       console.error("Failed to regenerate card", err);
     } finally {
@@ -78,53 +86,18 @@ export function CardDetail({
         <button type="button" onClick={onClose} className="rounded-full p-2 text-sm">
           ✕ {t("close")}
         </button>
-        <button
-          type="button"
-          onClick={() => setEditing((e) => !e)}
-          className="rounded-full border-2 border-black bg-sky px-4 py-1.5 text-sm font-semibold text-ink shadow-toon-sm"
-        >
-          {editing ? t("cancel") : t("edit")}
-        </button>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
-        {editing ? (
-          <div className="mx-auto flex max-w-sm flex-col gap-4">
-            <Field label={t("fieldWord")} value={form.word} onChange={(v) => setForm((f) => ({ ...f, word: v }))} />
-            <Field
-              label={t("fieldExample")}
-              value={form.example}
-              onChange={(v) => setForm((f) => ({ ...f, example: v }))}
-              multiline
-            />
-            <Field
-              label={t("fieldExplanation")}
-              value={form.explanation}
-              onChange={(v) => setForm((f) => ({ ...f, explanation: v }))}
-              multiline
-            />
-            <Field
-              label={t("fieldTranslation")}
-              value={form.translation}
-              onChange={(v) => setForm((f) => ({ ...f, translation: v }))}
-            />
-            <button
-              type="button"
-              disabled={busy}
-              onClick={handleSave}
-              className="rounded-2xl border-2 border-black bg-mint px-4 py-2.5 text-sm font-semibold text-ink shadow-toon-sm disabled:opacity-50"
-            >
-              {busy ? t("saving") : t("save")}
-            </button>
-          </div>
-        ) : (
-          <div
-            className="relative mx-auto aspect-[3/4] max-w-sm cursor-pointer"
-            onClick={() => setFlipped((f) => !f)}
-          >
-            <FlipCard card={card} flipped={flipped} />
-          </div>
-        )}
+        <SrsCard
+          key={card.id}
+          card={toSrsCard(card)}
+          learningLang={learningLang}
+          onGrade={(grade) => handleGrade(grade)}
+          onEdit={handleEdit}
+          onUploadImage={handleUploadImage}
+          onGenerateImage={handleGenerateImage}
+        />
       </div>
 
       <div className="flex items-center justify-center gap-3 p-4 pb-[max(env(safe-area-inset-bottom),1rem)]">
@@ -147,37 +120,8 @@ export function CardDetail({
       </div>
 
       {regenerating && (
-        <RegenerateModal
-          busy={busy}
-          onCancel={() => setRegenerating(false)}
-          onSubmit={handleRegenerate}
-        />
+        <RegenerateModal busy={busy} onCancel={() => setRegenerating(false)} onSubmit={handleRegenerate} />
       )}
     </div>
-  );
-}
-
-function Field({
-  label,
-  value,
-  onChange,
-  multiline,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  multiline?: boolean;
-}) {
-  const inputClass =
-    "rounded-2xl border-2 border-black bg-white p-3 text-sm text-ink outline-none";
-  return (
-    <label className="flex flex-col gap-1.5 text-left text-oncanvas">
-      <span className="text-xs font-semibold">{label}</span>
-      {multiline ? (
-        <textarea value={value} onChange={(e) => onChange(e.target.value)} rows={3} className={inputClass} />
-      ) : (
-        <input value={value} onChange={(e) => onChange(e.target.value)} className={inputClass} />
-      )}
-    </label>
   );
 }

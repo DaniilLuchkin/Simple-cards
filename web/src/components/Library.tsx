@@ -10,10 +10,12 @@ const DELETE_THRESHOLD = 90;
 
 export function Library({
   cards,
+  learningLang,
   onCardUpdated,
   onCardDeleted,
 }: {
   cards: Card[];
+  learningLang: string;
   onCardUpdated: (card: Card) => void;
   onCardDeleted: (cardId: string) => void;
 }) {
@@ -106,6 +108,7 @@ export function Library({
       {selectedCard && (
         <CardDetail
           card={selectedCard}
+          learningLang={learningLang}
           onClose={() => setSelectedId(null)}
           onUpdated={onCardUpdated}
           onDeleted={onCardDeleted}

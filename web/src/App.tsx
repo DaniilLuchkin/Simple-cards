@@ -210,7 +210,12 @@ export function App() {
           allCards === null ? (
             <p className="p-8 text-center text-sm text-oncanvas opacity-70">{t("loading")}</p>
           ) : (
-            <Library cards={allCards} onCardUpdated={handleCardUpdated} onCardDeleted={handleCardDeleted} />
+            <Library
+              cards={allCards}
+              learningLang={profile?.learningLanguage ?? "en"}
+              onCardUpdated={handleCardUpdated}
+              onCardDeleted={handleCardDeleted}
+            />
           )
         )}
 
