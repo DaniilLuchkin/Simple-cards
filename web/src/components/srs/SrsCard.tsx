@@ -209,7 +209,7 @@ export function SrsCard({
       onPointerCancel={editHold.onPointerCancel}
       onContextMenu={editHold.onContextMenu}
       onKeyDown={onCardKeyDown}
-      className="mx-auto h-[560px] w-full max-w-sm cursor-pointer select-none outline-none [perspective:1200px]"
+      className="mx-auto h-full min-h-[520px] w-full max-w-sm cursor-pointer select-none outline-none [perspective:1200px]"
     >
       <div
         className="relative h-full w-full rounded-[18px] shadow-toon [transform-style:preserve-3d]"
@@ -336,7 +336,7 @@ export function SrsCard({
 
           {card.collocations.length > 0 && (
             <div className="flex flex-wrap gap-2">
-              {card.collocations.map((c) => (
+              {card.collocations.slice(0, 2).map((c) => (
                 <span key={c} className="rounded-full border border-black bg-sky px-3 py-1.5 text-sm text-ink">
                   {c}
                 </span>
