@@ -6,6 +6,7 @@ import { sm2 } from "./sm2.js";
 import {
   createCard,
   createCardFromImage,
+  createCardSetFromRequest,
   getProfile,
   recordReview,
   regenerateCardWithComment,
@@ -256,6 +257,31 @@ cardsRouter.post("/", async (req, res) => {
   } catch (err) {
     console.error("Failed to create card", err);
     res.status(500).json({ error: "Failed to create card" });
+  }
+});
+
+// Generate a themed batch of cards from a natural-language request.
+const generateSetSchema = z.object({ request: z.string().min(1).max(500) });
+
+cardsRouter.post("/generate-set", async (req, res) => {
+  const parsed = generateSetSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten() });
+    return;
+  }
+  try {
+    const cards = await createCardSetFromRequest({
+      userId: req.dbUserId!,
+      request: parsed.data.request,
+    });
+    if (!cards.length) {
+      res.status(502).json({ error: "No cards generated" });
+      return;
+    }
+    res.status(201).json({ cards: cards.map(toApiCard) });
+  } catch (err) {
+    console.error("Failed to generate card set", err);
+    res.status(502).json({ error: "Failed to generate cards" });
   }
 });
 

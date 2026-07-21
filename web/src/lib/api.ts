@@ -173,6 +173,12 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ text, from, to }),
     }),
+  // Generate a themed batch of cards from a natural-language request.
+  generateCardSet: (request_: string) =>
+    request<{ cards: Card[] }>("/api/cards/generate-set", {
+      method: "POST",
+      body: JSON.stringify({ request: request_ }),
+    }),
   getProfile: () => request<{ profile: Profile }>("/api/me"),
   updateProfile: (update: ProfileUpdate) =>
     request<{ profile: Profile }>("/api/me", {

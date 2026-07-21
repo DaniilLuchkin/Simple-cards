@@ -1,6 +1,12 @@
 import type { Card } from "@prisma/client";
 import { prisma } from "./db.js";
-import { filledSentence, generateCard, generateCardFromImage, regenerateCard } from "./llm.js";
+import {
+  filledSentence,
+  generateCard,
+  generateCardFromImage,
+  generateCardSet,
+  regenerateCard,
+} from "./llm.js";
 import type { GeneratedCardFields } from "./llm.js";
 import { languageNames } from "./languages.js";
 import type { Languages } from "./languages.js";
@@ -85,6 +91,25 @@ export function createCardFromFields(input: { userId: string; fields: GeneratedC
   return prisma.card.create({
     data: { userId: input.userId, ...cardColumns(input.fields) },
   });
+}
+
+// Generates a themed batch of cards from a free-text request and persists them.
+export async function createCardSetFromRequest(input: {
+  userId: string;
+  request: string;
+  max?: number;
+}) {
+  const max = Math.min(input.max ?? 30, 30);
+  const [languages, existing] = await Promise.all([
+    userLanguages(input.userId),
+    listUserWords(input.userId),
+  ]);
+  const fieldsList = await generateCardSet(input.request, languages, existing, max);
+  return Promise.all(
+    fieldsList.map((fields) =>
+      prisma.card.create({ data: { userId: input.userId, ...cardColumns(fields) } })
+    )
+  );
 }
 
 // Recent vocabulary, used to keep the word of the day from repeating cards.

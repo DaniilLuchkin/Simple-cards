@@ -147,6 +147,55 @@ export async function generateWordOfDay(
   return parseGeneratedCard(content);
 }
 
+function cardSetPrompt(langs: Languages, max: number): string {
+  return `You are a vocabulary curator for "Simple Cards", an app for learning ${langs.learning} vocabulary. The user describes a set of flashcards they want in natural language — a topic, exam, situation, or level, and possibly a number of cards.
+
+Choose genuinely useful, real ${langs.learning} words or phrases that best match the request (varied, non-duplicate, no near-duplicates of each other). Honor the requested number of cards if one is given; otherwise pick about 10. NEVER produce more than ${max} cards. Do NOT include any word from the user's "already has" list.
+
+For EACH chosen word produce a flashcard object with these fields:
+${fieldRules(langs)}
+
+Respond ONLY with a JSON object: {"cards": [${JSON_SHAPE}, ...]}`;
+}
+
+// Generates a themed batch of flashcards from a free-text request.
+export async function generateCardSet(
+  request: string,
+  languages: Languages,
+  existingWords: string[],
+  max: number
+): Promise<GeneratedCardFields[]> {
+  const content = await chatCompletion(
+    [
+      { role: "system", content: cardSetPrompt(languages, max) },
+      {
+        role: "user",
+        content: [
+          `Request: ${request}`,
+          existingWords.length ? `Already has (do not repeat): ${existingWords.join(", ")}` : null,
+        ]
+          .filter(Boolean)
+          .join("\n"),
+      },
+    ],
+    { temperature: 0.7 }
+  );
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    throw new Error(`LLM did not return valid JSON: ${content}`);
+  }
+  const rawCards = (parsed as { cards?: unknown }).cards;
+  if (!Array.isArray(rawCards)) throw new Error(`LLM response had no cards array: ${content}`);
+
+  return rawCards
+    .map(coerceFields)
+    .filter((c): c is GeneratedCardFields => c !== null)
+    .slice(0, max);
+}
+
 export async function regenerateCard(input: {
   headword: string;
   previous: GeneratedCardFields;
@@ -267,23 +316,17 @@ function ensureCloze(sentence: string, headword: string): string {
   return sentence.replace(re, GAP);
 }
 
-function parseGeneratedCard(raw: string): GeneratedCardFields {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    throw new Error(`LLM did not return valid JSON: ${raw}`);
-  }
-
-  const obj = parsed as Record<string, unknown>;
+// Coerces one parsed JSON object into card fields, or null if required fields
+// are missing (used to defensively skip bad items in a batch).
+function coerceFields(value: unknown): GeneratedCardFields | null {
+  if (!value || typeof value !== "object") return null;
+  const obj = value as Record<string, unknown>;
   const headword = String(obj.headword ?? obj.word ?? "").trim();
   const explanation = String(obj.explanation ?? "").trim();
   const translation = String(obj.translation ?? "").trim();
   const rawSentence = String(obj.sentence ?? obj.example ?? "").trim();
 
-  if (!headword || !explanation || !translation || !rawSentence) {
-    throw new Error(`LLM JSON missing required fields: ${raw}`);
-  }
+  if (!headword || !explanation || !translation || !rawSentence) return null;
 
   return {
     headword,
@@ -295,6 +338,18 @@ function parseGeneratedCard(raw: string): GeneratedCardFields {
     translation,
     collocations: asStringArray(obj.collocations).slice(0, 3),
   };
+}
+
+function parseGeneratedCard(raw: string): GeneratedCardFields {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error(`LLM did not return valid JSON: ${raw}`);
+  }
+  const fields = coerceFields(parsed);
+  if (!fields) throw new Error(`LLM JSON missing required fields: ${raw}`);
+  return fields;
 }
 
 // The plain sentence with the gap filled by the headword - kept in `example`

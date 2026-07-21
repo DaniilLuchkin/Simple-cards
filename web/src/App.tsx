@@ -9,6 +9,7 @@ import { TabBar } from "./components/TabBar";
 import type { Tab } from "./components/TabBar";
 import { CameraButton } from "./components/CameraButton";
 import { Translator } from "./components/Translator";
+import { AiGenerate } from "./components/AiGenerate";
 
 function shuffle<T>(items: T[]): T[] {
   const result = [...items];
@@ -109,8 +110,13 @@ export function App() {
   }
 
   function addNewCard(card: Card) {
-    setDueCards((prev) => [card, ...(prev ?? [])]);
-    setAllCards((prev) => (prev ? [card, ...prev] : prev));
+    addCards([card]);
+  }
+
+  function addCards(cards: Card[]) {
+    if (!cards.length) return;
+    setDueCards((prev) => [...cards, ...(prev ?? [])]);
+    setAllCards((prev) => (prev ? [...cards, ...prev] : prev));
   }
 
   // Capture a photo -> generate a new card -> put it at the front of the review
@@ -176,6 +182,8 @@ export function App() {
 
       <main className="min-h-0 flex-1 pb-[max(env(safe-area-inset-bottom),0.5rem)]">
         {error && <p className="p-4 text-center text-sm text-red-500">{error}</p>}
+
+        {!error && tab === "ai" && <AiGenerate onCreated={addCards} />}
 
         {!error && tab === "translator" && (
           <Translator
