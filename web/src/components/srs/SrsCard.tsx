@@ -8,6 +8,7 @@ import type { Grade, SrsState } from "../../lib/srs";
 import { splitCloze } from "../../lib/srsCard";
 import type { SrsCard as SrsCardData } from "../../lib/srsCard";
 import { deriveCloze } from "../../lib/srsAdapter";
+import { localizePos } from "../../lib/pos";
 import type { Card } from "../../lib/api";
 
 // Solid grade fills from the ideal-flashcard spec (black text on top).
@@ -102,7 +103,7 @@ export function SrsCard({
   onUploadImage?: (file: File) => void;
   onGenerateImage?: () => Promise<void> | void;
 }) {
-  const { t } = usePrefs();
+  const { t, uiLang } = usePrefs();
   const reduceMotion = usePrefersReducedMotion();
   const [flipped, setFlipped] = useState(defaultFlipped);
   const [hintStep, setHintStep] = useState(0); // 0 none -> 1 pos -> 2 first letters
@@ -261,7 +262,9 @@ export function SrsCard({
                   className="flex cursor-pointer select-none flex-wrap items-center gap-2 text-sm"
                 >
                   {card.pos && (
-                    <span className="rounded-full border border-black px-3 py-1 text-muted">{card.pos}</span>
+                    <span className="rounded-full border border-black px-3 py-1 text-muted">
+                      {localizePos(card.pos, uiLang)}
+                    </span>
                   )}
                   <span className="rounded-full border border-black px-3 py-1 font-serif text-ink">
                     {card.headword.slice(0, hintStep >= 2 ? Math.min(3, card.headword.length) : 1)}…

@@ -52,9 +52,12 @@ export function CameraButton({ onGenerate }: { onGenerate: (file: File) => Promi
         type="button"
         onClick={openCamera}
         aria-label={t("camera")}
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 border-black bg-white text-base shadow-toon-sm"
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 border-black bg-mint text-ink shadow-toon-sm"
       >
-        📷
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden>
+          <path d="M4 8.5A1.5 1.5 0 0 1 5.5 7H7l1-1.5h8L17 7h1.5A1.5 1.5 0 0 1 20 8.5v9A1.5 1.5 0 0 1 18.5 19h-13A1.5 1.5 0 0 1 4 17.5v-9Z" />
+          <circle cx="12" cy="12.5" r="3" />
+        </svg>
       </button>
       <input
         ref={inputRef}
