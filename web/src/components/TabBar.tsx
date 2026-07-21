@@ -26,14 +26,14 @@ export function TabBar({
     // absolute positioning, no nested scroll region - just plain flex flow).
     // If long labels (e.g. Russian/Ukrainian) ever don't fit a narrow phone,
     // the whole row scrolls horizontally instead of clipping or overlapping.
-    <div className="-mx-4 flex items-center gap-1.5 overflow-x-auto px-4 py-2">
+    <div className="no-scrollbar -mx-4 flex items-center gap-1 overflow-x-auto px-4 py-2">
       {leading}
       {items.map((item) => (
         <button
           key={item.id}
           type="button"
           onClick={() => onChange(item.id)}
-          className={`shrink-0 rounded-full border-2 px-2.5 py-1 text-sm font-semibold transition ${
+          className={`shrink-0 rounded-full border-2 px-2 py-1 text-[13px] font-semibold transition ${
             tab === item.id
               ? "border-black bg-sky text-ink shadow-toon-sm"
               : "border-transparent bg-transparent text-oncanvas"

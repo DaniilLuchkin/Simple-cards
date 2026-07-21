@@ -55,3 +55,12 @@ body {
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior: none;
 }
+
+/* Scrollable without a visible scrollbar (e.g. the horizontal tab row). */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

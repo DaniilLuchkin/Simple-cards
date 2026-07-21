@@ -73,26 +73,42 @@ export function Library({
         </span>
         {selectMode ? (
           <div className="flex gap-2">
-            <button type="button" onClick={exitSelect} className="text-sm opacity-70">
+            <button
+              type="button"
+              onClick={exitSelect}
+              className="rounded-full border-2 border-black bg-white px-3 py-1 text-sm font-semibold text-ink shadow-toon-sm"
+            >
               {t("cancel")}
             </button>
             <button
               type="button"
               disabled={busy || checked.size === 0}
               onClick={deleteChecked}
-              className="text-sm font-semibold text-rose-500 disabled:opacity-40"
+              className="rounded-full border-2 border-black bg-rose-400 px-3 py-1 text-sm font-semibold text-ink shadow-toon-sm disabled:opacity-50"
             >
               {t("deleteSelected")}
             </button>
           </div>
         ) : (
-          <button type="button" onClick={() => setSelectMode(true)} className="text-sm font-semibold">
+          <button
+            type="button"
+            onClick={() => setSelectMode(true)}
+            className="rounded-full border-2 border-black bg-white px-3 py-1 text-sm font-semibold text-ink shadow-toon-sm"
+          >
             {t("select")}
           </button>
         )}
       </div>
 
-      <div className="-mx-2 flex flex-1 flex-col gap-3 overflow-y-auto px-2 pb-6 pt-1">
+      <div
+        className="no-scrollbar -mx-2 flex flex-1 flex-col gap-3 overflow-y-auto px-2 pb-8 pt-3"
+        style={{
+          maskImage:
+            "linear-gradient(to bottom, transparent 0, #000 16px, #000 calc(100% - 16px), transparent 100%)",
+          WebkitMaskImage:
+            "linear-gradient(to bottom, transparent 0, #000 16px, #000 calc(100% - 16px), transparent 100%)",
+        }}
+      >
         {cards.map((card) => (
           <LibraryRow
             key={card.id}
