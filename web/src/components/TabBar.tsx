@@ -1,8 +1,17 @@
+import type { ReactNode } from "react";
 import { usePrefs } from "../lib/prefs";
 
 export type Tab = "review" | "library" | "profile";
 
-export function TabBar({ tab, onChange }: { tab: Tab; onChange: (tab: Tab) => void }) {
+export function TabBar({
+  tab,
+  onChange,
+  leading,
+}: {
+  tab: Tab;
+  onChange: (tab: Tab) => void;
+  leading?: ReactNode;
+}) {
   const { t, theme, toggleTheme } = usePrefs();
   const items = [
     { id: "review", label: t("tabReview") },
@@ -17,6 +26,7 @@ export function TabBar({ tab, onChange }: { tab: Tab; onChange: (tab: Tab) => vo
     // If long labels (e.g. Russian/Ukrainian) ever don't fit a narrow phone,
     // the whole row scrolls horizontally instead of clipping or overlapping.
     <div className="-mx-4 flex items-center gap-1.5 overflow-x-auto px-4 py-2">
+      {leading}
       {items.map((item) => (
         <button
           key={item.id}

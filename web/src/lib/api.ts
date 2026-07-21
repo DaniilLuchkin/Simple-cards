@@ -146,6 +146,22 @@ export const api = {
   },
   generateCardImage: (id: string) =>
     request<{ card: Card }>(`/api/cards/${id}/image/generate`, { method: "POST" }),
+  // Creates a new card from a captured photo (raw image body, not JSON).
+  createCardFromImage: async (file: File): Promise<{ card: Card }> => {
+    const res = await fetch(`${API_URL}/api/cards/from-image`, {
+      method: "POST",
+      headers: {
+        "Content-Type": file.type || "image/jpeg",
+        "X-Telegram-Init-Data": getInitData(),
+      },
+      body: file,
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error ? JSON.stringify(body.error) : `Request failed: ${res.status}`);
+    }
+    return res.json() as Promise<{ card: Card }>;
+  },
   getProfile: () => request<{ profile: Profile }>("/api/me"),
   updateProfile: (update: ProfileUpdate) =>
     request<{ profile: Profile }>("/api/me", {

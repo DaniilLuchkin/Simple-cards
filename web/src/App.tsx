@@ -7,6 +7,7 @@ import { Library } from "./components/Library";
 import { Profile } from "./components/Profile";
 import { TabBar } from "./components/TabBar";
 import type { Tab } from "./components/TabBar";
+import { CameraButton } from "./components/CameraButton";
 
 function shuffle<T>(items: T[]): T[] {
   const result = [...items];
@@ -106,6 +107,15 @@ export function App() {
     handleCardUpdated(updated);
   }
 
+  // Capture a photo -> generate a new card -> put it at the front of the review
+  // deck and switch to the Review tab so the user sees it right away.
+  async function handleCaptureCard(file: File) {
+    const { card } = await api.createCardFromImage(file);
+    setDueCards((prev) => [card, ...(prev ?? [])]);
+    setAllCards((prev) => (prev ? [card, ...prev] : prev));
+    setTab("review");
+  }
+
   async function handleUndo() {
     if (!undoInfo) return;
     const { card, snapshot, practice } = undoInfo;
@@ -157,7 +167,7 @@ export function App() {
 
   return (
     <div className="mx-auto flex h-[100dvh] max-w-md flex-col overflow-hidden px-4 pt-[max(env(safe-area-inset-top),0.5rem)]">
-      <TabBar tab={tab} onChange={setTab} />
+      <TabBar tab={tab} onChange={setTab} leading={<CameraButton onGenerate={handleCaptureCard} />} />
 
       <main className="min-h-0 flex-1 pb-[max(env(safe-area-inset-bottom),0.5rem)]">
         {error && <p className="p-4 text-center text-sm text-red-500">{error}</p>}

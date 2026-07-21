@@ -3,7 +3,13 @@ import { z } from "zod";
 import type { Card } from "@prisma/client";
 import { prisma } from "./db.js";
 import { sm2 } from "./sm2.js";
-import { getProfile, recordReview, regenerateCardWithComment, updateProfile } from "./services.js";
+import {
+  createCardFromImage,
+  getProfile,
+  recordReview,
+  regenerateCardWithComment,
+  updateProfile,
+} from "./services.js";
 import { generateImage } from "./llm.js";
 import { gradeSchedule } from "./srsSchedule.js";
 import { LANGUAGE_NAMES } from "./languages.js";
@@ -199,6 +205,32 @@ cardsRouter.post("/:id/regenerate", async (req, res) => {
     res.status(500).json({ error: "Failed to regenerate card" });
   }
 });
+
+// Create a brand-new card from a captured photo (mirrors the bot's photo flow).
+// The raw image bytes are the body (Content-Type image/*).
+cardsRouter.post(
+  "/from-image",
+  express.raw({ type: "image/*", limit: "12mb" }),
+  async (req, res) => {
+    const body = req.body as Buffer;
+    if (!Buffer.isBuffer(body) || body.length === 0) {
+      res.status(400).json({ error: "Empty image" });
+      return;
+    }
+    try {
+      const imagePath = await saveImage(body, req.get("content-type") ?? "image/jpeg");
+      const card = await createCardFromImage({ userId: req.dbUserId!, imagePath });
+      if (!card) {
+        res.status(422).json({ error: "Could not recognize the photo" });
+        return;
+      }
+      res.status(201).json({ card: toApiCard(card) });
+    } catch (err) {
+      console.error("Failed to create card from image", err);
+      res.status(500).json({ error: "Failed to create card from image" });
+    }
+  }
+);
 
 const updateSchema = z
   .object({
