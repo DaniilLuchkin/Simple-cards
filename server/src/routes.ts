@@ -59,6 +59,21 @@ const profileSchema = z
     translationLanguage: z.enum(LANGUAGE_CODES),
     interfaceLanguage: z.enum(LANGUAGE_CODES),
     dailyGoal: z.number().int().min(1).max(500),
+    timezone: z
+      .string()
+      .min(1)
+      .max(64)
+      .refine(
+        (v) => {
+          try {
+            new Intl.DateTimeFormat("en-CA", { timeZone: v });
+            return true;
+          } catch {
+            return false;
+          }
+        },
+        { message: "invalid timezone" }
+      ),
   })
   .partial()
   .refine((d) => Object.keys(d).length > 0, { message: "No fields to update" });

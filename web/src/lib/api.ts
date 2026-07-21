@@ -52,6 +52,8 @@ export type Profile = {
   // client's own local preference wins in that case.
   interfaceLanguage: string | null;
   dailyGoal: number;
+  // IANA timezone used for day boundaries (null = UTC / not detected yet).
+  timezone: string | null;
   todayCount: number;
   streak: number;
   // { "2026-07-03": 12, ... }
@@ -59,7 +61,10 @@ export type Profile = {
 };
 
 export type ProfileUpdate = Partial<
-  Pick<Profile, "learningLanguage" | "translationLanguage" | "interfaceLanguage" | "dailyGoal">
+  Pick<
+    Profile,
+    "learningLanguage" | "translationLanguage" | "interfaceLanguage" | "dailyGoal" | "timezone"
+  >
 >;
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {

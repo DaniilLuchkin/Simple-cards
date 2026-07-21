@@ -11,9 +11,12 @@ const HEATMAP: Record<Palette, { met: string; below: string }> = {
   sky: { met: "#3b82f6", below: "#93c5fd" },
 };
 
-function utcToday(): Date {
+// This device's local calendar day, anchored at UTC-midnight so the ISO key
+// matches the server's local-date keys (the day counter rolls over at the
+// user's local midnight).
+function localToday(): Date {
   const now = new Date();
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  return new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
 }
 
 function key(d: Date): string {
@@ -29,7 +32,7 @@ export function ActivityHeatmap({
   activity: Record<string, number>;
   goal: number;
 }) {
-  const today = utcToday();
+  const today = localToday();
   const dowMon = (today.getUTCDay() + 6) % 7; // Mon=0 .. Sun=6
   const start = new Date(today);
   start.setUTCDate(start.getUTCDate() - dowMon - (WEEKS - 1) * 7);

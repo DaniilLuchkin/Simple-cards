@@ -161,9 +161,32 @@ function utcDay(date = new Date()): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
 }
 
+// The user's local calendar day, stored as a UTC-midnight Date so it still fits
+// ReviewDay.day @db.Date. null tz => UTC (unchanged behavior for users who
+// haven't opened the Mini App since timezone detection shipped).
+function localDay(tz: string | null, date = new Date()): Date {
+  if (!tz) return utcDay(date);
+  try {
+    const s = new Intl.DateTimeFormat("en-CA", {
+      timeZone: tz,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(date); // "2026-07-21"
+    const [y, m, d] = s.split("-").map(Number);
+    return new Date(Date.UTC(y, m - 1, d));
+  } catch {
+    return utcDay(date); // bad tz string => UTC
+  }
+}
+
 // Records one review toward today's streak count.
 export async function recordReview(userId: string) {
-  const day = utcDay();
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { timezone: true },
+  });
+  const day = localDay(user?.timezone ?? null);
   await prisma.reviewDay.upsert({
     where: { userId_day: { userId, day } },
     update: { count: { increment: 1 } },
@@ -177,6 +200,8 @@ export type Profile = {
   // null = no explicit choice yet; client falls back to its own default.
   interfaceLanguage: string | null;
   dailyGoal: number;
+  // IANA timezone used for day boundaries (null = UTC).
+  timezone: string | null;
   todayCount: number;
   streak: number;
   // { "2026-07-03": 12, ... } for roughly the last ~130 days.
@@ -195,10 +220,11 @@ export async function getProfile(userId: string): Promise<Profile> {
       translationLanguage: true,
       interfaceLanguage: true,
       dailyGoal: true,
+      timezone: true,
     },
   });
 
-  const since = utcDay();
+  const since = localDay(user.timezone);
   since.setUTCDate(since.getUTCDate() - 132);
   const days = await prisma.reviewDay.findMany({
     where: { userId, day: { gte: since } },
@@ -208,13 +234,13 @@ export async function getProfile(userId: string): Promise<Profile> {
   const activity: Record<string, number> = {};
   for (const d of days) activity[dayKey(d.day)] = d.count;
 
-  const todayKey = dayKey(utcDay());
+  const todayKey = dayKey(localDay(user.timezone));
   const todayCount = activity[todayKey] ?? 0;
 
   // Streak = consecutive days up to today meeting the goal. Today not yet met
   // doesn't break the streak (the day isn't over), it just doesn't extend it.
   let streak = 0;
-  const cursor = utcDay();
+  const cursor = localDay(user.timezone);
   if (todayCount < user.dailyGoal) cursor.setUTCDate(cursor.getUTCDate() - 1);
   while ((activity[dayKey(cursor)] ?? 0) >= user.dailyGoal) {
     streak += 1;
@@ -226,6 +252,7 @@ export async function getProfile(userId: string): Promise<Profile> {
     translationLanguage: user.translationLanguage,
     interfaceLanguage: user.interfaceLanguage,
     dailyGoal: user.dailyGoal,
+    timezone: user.timezone,
     todayCount,
     streak,
     activity,
@@ -239,6 +266,7 @@ export async function updateProfile(
     translationLanguage?: string;
     interfaceLanguage?: string;
     dailyGoal?: number;
+    timezone?: string;
   }
 ) {
   await prisma.user.update({ where: { id: userId }, data });

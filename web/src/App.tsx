@@ -56,6 +56,13 @@ export function App() {
         if (res.profile.interfaceLanguage && res.profile.interfaceLanguage !== uiLang) {
           setUiLang(res.profile.interfaceLanguage);
         }
+        // The day counter/streak roll over at this device's local midnight.
+        // Persist the detected timezone so the server computes day boundaries
+        // to match - only writing when it actually changed.
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        if (tz && tz !== res.profile.timezone) {
+          handleUpdateProfile({ timezone: tz });
+        }
       })
       .catch((err) => setError(String(err)));
     // Intentionally run once on mount only.

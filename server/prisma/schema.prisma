@@ -22,6 +22,9 @@ model User {
   interfaceLanguage   String?
   // Target number of reviews per day for the streak/heatmap.
   dailyGoal Int @default(10)
+  // IANA timezone (e.g. "Europe/Berlin") auto-detected by the Mini App; day
+  // boundaries for the streak/heatmap are computed here. null => UTC.
+  timezone String?
 
   // When the daily word-of-the-day message was last sent to this user.
   lastWordOfDayAt DateTime?
