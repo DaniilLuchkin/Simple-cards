@@ -12,7 +12,7 @@ export function TabBar({
   onChange: (tab: Tab) => void;
   leading?: ReactNode;
 }) {
-  const { t, theme, toggleTheme } = usePrefs();
+  const { t } = usePrefs();
   const items = [
     { id: "ai", label: t("tabAi") },
     { id: "translator", label: t("tabTranslator") },
@@ -22,11 +22,9 @@ export function TabBar({
   ] as const;
 
   return (
-    // Tabs + theme toggle on one row to save vertical space for the card.
-    // Natural-width pills, theme button pushed to the end with ml-auto (no
-    // absolute positioning, no nested scroll region - just plain flex flow).
-    // If long labels (e.g. Russian/Ukrainian) ever don't fit a narrow phone,
-    // the whole row scrolls horizontally instead of clipping or overlapping.
+    // Leading camera button + natural-width tab pills on one compact row (the
+    // theme toggle now lives in Profile). If long labels don't fit a narrow
+    // phone it scrolls horizontally with the scrollbar hidden (no-scrollbar).
     <div className="no-scrollbar -mx-4 flex items-center gap-1 overflow-x-auto px-4 py-2">
       {leading}
       {items.map((item) => (
@@ -43,14 +41,6 @@ export function TabBar({
           {item.label}
         </button>
       ))}
-      <button
-        type="button"
-        onClick={toggleTheme}
-        aria-label="Toggle theme"
-        className="ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 border-black bg-white text-sm shadow-toon-sm"
-      >
-        {theme === "dark" ? "☀️" : "🌙"}
-      </button>
     </div>
   );
 }

@@ -18,7 +18,7 @@ export function Profile({
   profile: ProfileData;
   onUpdate: (update: ProfileUpdate) => void;
 }) {
-  const { t, uiLang, setUiLang, palette, setPalette } = usePrefs();
+  const { t, uiLang, setUiLang, palette, setPalette, theme, toggleTheme } = usePrefs();
   const [goal, setGoal] = useState(profile.dailyGoal);
 
   const goalMet = profile.todayCount >= profile.dailyGoal;
@@ -73,6 +73,37 @@ export function Profile({
             className="h-8 w-8 rounded-full border-2 border-black bg-white text-lg font-semibold text-ink shadow-toon-sm"
           >
             +
+          </button>
+        </div>
+      </div>
+
+      {/* Light / dark theme */}
+      <div className="rounded-2xl border-2 border-black bg-surface p-4 shadow-toon">
+        <p className="mb-3 text-sm text-ink">{t("theme")}</p>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            aria-pressed={theme === "light"}
+            onClick={() => {
+              if (theme !== "light") toggleTheme();
+            }}
+            className={`flex-1 rounded-xl border-2 border-black px-3 py-2 text-sm font-semibold text-ink shadow-toon-sm ${
+              theme === "light" ? "bg-sky" : "bg-white"
+            }`}
+          >
+            ☀️ {t("themeLight")}
+          </button>
+          <button
+            type="button"
+            aria-pressed={theme === "dark"}
+            onClick={() => {
+              if (theme !== "dark") toggleTheme();
+            }}
+            className={`flex-1 rounded-xl border-2 border-black px-3 py-2 text-sm font-semibold text-ink shadow-toon-sm ${
+              theme === "dark" ? "bg-sky" : "bg-white"
+            }`}
+          >
+            🌙 {t("themeDark")}
           </button>
         </div>
       </div>
