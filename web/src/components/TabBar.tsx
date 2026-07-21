@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { usePrefs } from "../lib/prefs";
 
-export type Tab = "review" | "library" | "profile";
+export type Tab = "translator" | "review" | "library" | "profile";
 
 export function TabBar({
   tab,
@@ -14,6 +14,7 @@ export function TabBar({
 }) {
   const { t, theme, toggleTheme } = usePrefs();
   const items = [
+    { id: "translator", label: t("tabTranslator") },
     { id: "review", label: t("tabReview") },
     { id: "library", label: t("tabLibrary") },
     { id: "profile", label: t("tabProfile") },

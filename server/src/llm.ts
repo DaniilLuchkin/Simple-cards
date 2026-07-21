@@ -204,6 +204,26 @@ export async function generateImage(prompt: string): Promise<{ buffer: Buffer; c
   return { buffer: Buffer.from(b64, "base64"), contentType };
 }
 
+// Plain text translation for the in-app translator.
+export async function translateText(text: string, fromName: string, toName: string): Promise<string> {
+  const content = await chatCompletion(
+    [
+      {
+        role: "system",
+        content: `You are a translator. Translate the user's text from ${fromName} to ${toName}. Give the most natural everyday translation. Respond ONLY with JSON: {"translation": "..."} — no notes, no alternatives.`,
+      },
+      { role: "user", content: text },
+    ],
+    { temperature: 0 }
+  );
+  try {
+    const obj = JSON.parse(content) as { translation?: string };
+    return String(obj.translation ?? "").trim();
+  } catch {
+    return content.trim();
+  }
+}
+
 async function chatCompletion(messages: ChatMessage[], opts?: { temperature?: number }): Promise<string> {
   const res = await fetch(OPENROUTER_URL, {
     method: "POST",

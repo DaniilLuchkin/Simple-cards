@@ -162,6 +162,17 @@ export const api = {
     }
     return res.json() as Promise<{ card: Card }>;
   },
+  // Create a card from a word/phrase (e.g. from the translator).
+  createCard: (word: string, example?: string) =>
+    request<{ card: Card }>("/api/cards", {
+      method: "POST",
+      body: JSON.stringify({ word, example }),
+    }),
+  translate: (text: string, from: string, to: string) =>
+    request<{ translation: string }>("/api/translate", {
+      method: "POST",
+      body: JSON.stringify({ text, from, to }),
+    }),
   getProfile: () => request<{ profile: Profile }>("/api/me"),
   updateProfile: (update: ProfileUpdate) =>
     request<{ profile: Profile }>("/api/me", {

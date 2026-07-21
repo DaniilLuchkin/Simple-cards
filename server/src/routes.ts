@@ -4,21 +4,49 @@ import type { Card } from "@prisma/client";
 import { prisma } from "./db.js";
 import { sm2 } from "./sm2.js";
 import {
+  createCard,
   createCardFromImage,
   getProfile,
   recordReview,
   regenerateCardWithComment,
   updateProfile,
 } from "./services.js";
-import { generateImage } from "./llm.js";
+import { generateImage, translateText } from "./llm.js";
 import { gradeSchedule } from "./srsSchedule.js";
-import { LANGUAGE_NAMES } from "./languages.js";
+import { LANGUAGE_NAMES, languageName } from "./languages.js";
 import { absoluteImageUrl, saveImage } from "./storage.js";
 
 export const cardsRouter = Router();
 export const meRouter = Router();
+export const translateRouter = Router();
 
 const LANGUAGE_CODES = Object.keys(LANGUAGE_NAMES) as [string, ...string[]];
+
+// In-app translator: translate free text between two supported languages.
+const translateSchema = z.object({
+  text: z.string().min(1).max(1000),
+  from: z.enum(LANGUAGE_CODES),
+  to: z.enum(LANGUAGE_CODES),
+});
+
+translateRouter.post("/", async (req, res) => {
+  const parsed = translateSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten() });
+    return;
+  }
+  try {
+    const translation = await translateText(
+      parsed.data.text,
+      languageName(parsed.data.from),
+      languageName(parsed.data.to)
+    );
+    res.json({ translation });
+  } catch (err) {
+    console.error("Translate failed", err);
+    res.status(502).json({ error: "Translate failed" });
+  }
+});
 
 meRouter.get("/", async (req, res) => {
   res.json({ profile: await getProfile(req.dbUserId!) });
@@ -203,6 +231,31 @@ cardsRouter.post("/:id/regenerate", async (req, res) => {
   } catch (err) {
     console.error("Regenerate failed", err);
     res.status(500).json({ error: "Failed to regenerate card" });
+  }
+});
+
+// Create a brand-new card from a word/phrase (e.g. from the translator).
+const createSchema = z.object({
+  word: z.string().min(1).max(200),
+  example: z.string().max(500).optional(),
+});
+
+cardsRouter.post("/", async (req, res) => {
+  const parsed = createSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten() });
+    return;
+  }
+  try {
+    const card = await createCard({
+      userId: req.dbUserId!,
+      word: parsed.data.word,
+      userExample: parsed.data.example,
+    });
+    res.status(201).json({ card: toApiCard(card) });
+  } catch (err) {
+    console.error("Failed to create card", err);
+    res.status(500).json({ error: "Failed to create card" });
   }
 });
 
