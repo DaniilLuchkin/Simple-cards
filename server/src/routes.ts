@@ -410,11 +410,12 @@ cardsRouter.post("/:id/image/generate", async (req, res) => {
   }
 
   const prompt = [
-    "A clear, simple, friendly illustration for a vocabulary flashcard.",
-    `Depict the meaning of the word "${card.word}".`,
-    card.example ? `Context: "${card.example}".` : null,
+    "A clean, friendly illustration for a vocabulary flashcard — a purely visual, wordless picture.",
+    `It should clearly show the meaning of the word "${card.word}" so someone can guess the word just by looking.`,
     card.explanation ? `Meaning: ${card.explanation}.` : null,
-    "Single clear subject, soft pastel colors, no text or letters in the image.",
+    card.example ? `Scene/context: "${card.example}".` : null,
+    "One clear main subject, soft pastel colors, simple uncluttered background, flat modern illustration style.",
+    "Absolutely NO text of any kind: no letters, words, numbers, captions, labels, signs, speech bubbles, logos or watermarks anywhere in the image.",
   ]
     .filter(Boolean)
     .join(" ");
