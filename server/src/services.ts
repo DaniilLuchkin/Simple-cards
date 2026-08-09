@@ -285,6 +285,8 @@ export type Profile = {
   dailyGoal: number;
   // IANA timezone used for day boundaries (null = UTC).
   timezone: string | null;
+  // Whether the daily word-of-the-day message is sent.
+  wordOfDayEnabled: boolean;
   todayCount: number;
   streak: number;
   // { "2026-07-03": 12, ... } for roughly the last ~130 days.
@@ -304,6 +306,7 @@ export async function getProfile(userId: string): Promise<Profile> {
       interfaceLanguage: true,
       dailyGoal: true,
       timezone: true,
+      wordOfDayEnabled: true,
     },
   });
 
@@ -336,6 +339,7 @@ export async function getProfile(userId: string): Promise<Profile> {
     interfaceLanguage: user.interfaceLanguage,
     dailyGoal: user.dailyGoal,
     timezone: user.timezone,
+    wordOfDayEnabled: user.wordOfDayEnabled,
     todayCount,
     streak,
     activity,
@@ -350,6 +354,7 @@ export async function updateProfile(
     interfaceLanguage?: string;
     dailyGoal?: number;
     timezone?: string;
+    wordOfDayEnabled?: boolean;
   }
 ) {
   await prisma.user.update({ where: { id: userId }, data });

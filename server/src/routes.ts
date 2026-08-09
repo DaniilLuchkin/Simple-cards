@@ -78,6 +78,7 @@ const profileSchema = z
         },
         { message: "invalid timezone" }
       ),
+    wordOfDayEnabled: z.boolean(),
   })
   .partial()
   .refine((d) => Object.keys(d).length > 0, { message: "No fields to update" });

@@ -77,6 +77,27 @@ export function Profile({
         </div>
       </div>
 
+      {/* Word of the day on/off */}
+      <div className="flex items-center justify-between rounded-2xl border-2 border-black bg-surface px-4 py-3 shadow-toon">
+        <span className="text-sm text-ink">{t("wordOfDay")}</span>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={profile.wordOfDayEnabled}
+          aria-label={t("wordOfDay")}
+          onClick={() => onUpdate({ wordOfDayEnabled: !profile.wordOfDayEnabled })}
+          className={`relative h-8 w-14 rounded-full border-2 border-black shadow-toon-sm transition-colors ${
+            profile.wordOfDayEnabled ? "bg-mint" : "bg-white"
+          }`}
+        >
+          <span
+            className={`absolute top-1/2 h-5 w-5 -translate-y-1/2 rounded-full border-2 border-black bg-white transition-all ${
+              profile.wordOfDayEnabled ? "left-[26px]" : "left-[2px]"
+            }`}
+          />
+        </button>
+      </div>
+
       {/* Light / dark theme */}
       <div className="rounded-2xl border-2 border-black bg-surface p-4 shadow-toon">
         <p className="mb-3 text-sm text-ink">{t("theme")}</p>

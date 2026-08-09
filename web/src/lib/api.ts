@@ -78,6 +78,8 @@ export type Profile = {
   dailyGoal: number;
   // IANA timezone used for day boundaries (null = UTC / not detected yet).
   timezone: string | null;
+  // Whether the daily word-of-the-day message is sent.
+  wordOfDayEnabled: boolean;
   todayCount: number;
   streak: number;
   // { "2026-07-03": 12, ... }
@@ -87,7 +89,12 @@ export type Profile = {
 export type ProfileUpdate = Partial<
   Pick<
     Profile,
-    "learningLanguage" | "translationLanguage" | "interfaceLanguage" | "dailyGoal" | "timezone"
+    | "learningLanguage"
+    | "translationLanguage"
+    | "interfaceLanguage"
+    | "dailyGoal"
+    | "timezone"
+    | "wordOfDayEnabled"
   >
 >;
 

@@ -25,6 +25,8 @@ model User {
   // IANA timezone (e.g. "Europe/Berlin") auto-detected by the Mini App; day
   // boundaries for the streak/heatmap are computed here. null => UTC.
   timezone String?
+  // Whether the daily "word of the day" message is sent to this user.
+  wordOfDayEnabled Boolean @default(true)
 
   // When the daily word-of-the-day message was last sent to this user.
   lastWordOfDayAt DateTime?

@@ -87,6 +87,7 @@ async function tick(bot: Bot) {
   const startOfTodayUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
   const users = await prisma.user.findMany({
     where: {
+      wordOfDayEnabled: true,
       OR: [{ lastWordOfDayAt: null }, { lastWordOfDayAt: { lt: startOfTodayUtc } }],
     },
     select: { id: true, telegramId: true, learningLanguage: true, translationLanguage: true },
