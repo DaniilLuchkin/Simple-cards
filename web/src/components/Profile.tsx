@@ -93,25 +93,11 @@ export function Profile({
       </div>
 
       {/* Show word-count milestones on/off */}
-      <div className="flex items-center justify-between rounded-2xl border-2 border-black bg-surface px-4 py-3 shadow-toon">
-        <span className="text-sm text-ink">{t("showMilestonesLabel")}</span>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={profile.showMilestones}
-          aria-label={t("showMilestonesLabel")}
-          onClick={() => onUpdate({ showMilestones: !profile.showMilestones })}
-          className={`relative h-8 w-14 rounded-full border-2 border-black shadow-toon-sm transition-colors ${
-            profile.showMilestones ? "bg-mint" : "bg-white"
-          }`}
-        >
-          <span
-            className={`absolute top-1/2 h-5 w-5 -translate-y-1/2 rounded-full border-2 border-black bg-white transition-all ${
-              profile.showMilestones ? "left-[26px]" : "left-[2px]"
-            }`}
-          />
-        </button>
-      </div>
+      <ToggleRow
+        label={t("showMilestonesLabel")}
+        checked={profile.showMilestones}
+        onToggle={() => onUpdate({ showMilestones: !profile.showMilestones })}
+      />
 
       {/* Activity heatmap */}
       <div className="rounded-2xl border-2 border-black bg-surface p-5 shadow-toon">
@@ -141,26 +127,17 @@ export function Profile({
         </div>
       </div>
 
-      {/* Word of the day on/off */}
-      <div className="flex items-center justify-between rounded-2xl border-2 border-black bg-surface px-4 py-3 shadow-toon">
-        <span className="text-sm text-ink">{t("wordOfDay")}</span>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={profile.wordOfDayEnabled}
-          aria-label={t("wordOfDay")}
-          onClick={() => onUpdate({ wordOfDayEnabled: !profile.wordOfDayEnabled })}
-          className={`relative h-8 w-14 rounded-full border-2 border-black shadow-toon-sm transition-colors ${
-            profile.wordOfDayEnabled ? "bg-mint" : "bg-white"
-          }`}
-        >
-          <span
-            className={`absolute top-1/2 h-5 w-5 -translate-y-1/2 rounded-full border-2 border-black bg-white transition-all ${
-              profile.wordOfDayEnabled ? "left-[26px]" : "left-[2px]"
-            }`}
-          />
-        </button>
-      </div>
+      {/* Daily reminder + word of the day */}
+      <ToggleRow
+        label={t("reminders")}
+        checked={profile.reminderEnabled}
+        onToggle={() => onUpdate({ reminderEnabled: !profile.reminderEnabled })}
+      />
+      <ToggleRow
+        label={t("wordOfDay")}
+        checked={profile.wordOfDayEnabled}
+        onToggle={() => onUpdate({ wordOfDayEnabled: !profile.wordOfDayEnabled })}
+      />
 
       {/* Light / dark theme */}
       <div className="rounded-2xl border-2 border-black bg-surface p-4 shadow-toon">
@@ -239,6 +216,39 @@ export function Profile({
           onChange={(code) => onUpdate({ translationLanguage: code })}
         />
       </div>
+    </div>
+  );
+}
+
+// A labeled on/off switch styled like the rest of the toon settings.
+function ToggleRow({
+  label,
+  checked,
+  onToggle,
+}: {
+  label: string;
+  checked: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div className="flex items-center justify-between rounded-2xl border-2 border-black bg-surface px-4 py-3 shadow-toon">
+      <span className="text-sm text-ink">{label}</span>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-label={label}
+        onClick={onToggle}
+        className={`relative h-8 w-14 rounded-full border-2 border-black shadow-toon-sm transition-colors ${
+          checked ? "bg-mint" : "bg-white"
+        }`}
+      >
+        <span
+          className={`absolute top-1/2 h-5 w-5 -translate-y-1/2 rounded-full border-2 border-black bg-white transition-all ${
+            checked ? "left-[26px]" : "left-[2px]"
+          }`}
+        />
+      </button>
     </div>
   );
 }

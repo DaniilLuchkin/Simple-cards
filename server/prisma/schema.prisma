@@ -39,6 +39,11 @@ model User {
   // When the daily word-of-the-day message was last sent to this user.
   lastWordOfDayAt DateTime?
 
+  // Daily streak reminder (a bot nudge at REMINDER_LOCAL_HOUR local time when
+  // the day's goal isn't met yet).
+  reminderEnabled Boolean   @default(true)
+  lastReminderAt  DateTime?
+
   cards      Card[]
   reviewDays ReviewDay[]
 }

@@ -79,6 +79,7 @@ const profileSchema = z
         { message: "invalid timezone" }
       ),
     wordOfDayEnabled: z.boolean(),
+    reminderEnabled: z.boolean(),
     currentLevel: z.enum(["A0", "A1", "A2", "B1", "B2", "C1", "C2"]),
     targetLevel: z.enum(["A1", "A2", "B1", "B2", "C1", "C2"]),
     showMilestones: z.boolean(),

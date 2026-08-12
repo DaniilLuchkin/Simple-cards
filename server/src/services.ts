@@ -300,6 +300,8 @@ export type Profile = {
   timezone: string | null;
   // Whether the daily word-of-the-day message is sent.
   wordOfDayEnabled: boolean;
+  // Whether the daily streak reminder is sent.
+  reminderEnabled: boolean;
   // CEFR self-assessed level and goal.
   currentLevel: string;
   targetLevel: string;
@@ -327,6 +329,7 @@ export async function getProfile(userId: string): Promise<Profile> {
       dailyGoal: true,
       timezone: true,
       wordOfDayEnabled: true,
+      reminderEnabled: true,
       currentLevel: true,
       targetLevel: true,
       showMilestones: true,
@@ -367,6 +370,7 @@ export async function getProfile(userId: string): Promise<Profile> {
     dailyGoal: user.dailyGoal,
     timezone: user.timezone,
     wordOfDayEnabled: user.wordOfDayEnabled,
+    reminderEnabled: user.reminderEnabled,
     currentLevel: user.currentLevel,
     targetLevel: user.targetLevel,
     showMilestones: user.showMilestones,
@@ -386,6 +390,7 @@ export async function updateProfile(
     dailyGoal?: number;
     timezone?: string;
     wordOfDayEnabled?: boolean;
+    reminderEnabled?: boolean;
     currentLevel?: string;
     targetLevel?: string;
     showMilestones?: boolean;

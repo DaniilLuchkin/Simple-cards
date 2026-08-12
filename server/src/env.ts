@@ -37,6 +37,8 @@ const schema = z.object({
 
   // UTC hour at which the daily word-of-the-day is sent (9 = 12:00 MSK).
   WORD_OF_DAY_UTC_HOUR: z.coerce.number().int().min(0).max(23).default(9),
+  // Local hour (in each user's timezone) at which the streak reminder is sent.
+  REMINDER_LOCAL_HOUR: z.coerce.number().int().min(0).max(23).default(19),
 
   // Where uploaded card images are stored on disk. Point this at a mounted
   // volume (e.g. /data/uploads) for persistence across deploys.
