@@ -40,6 +40,16 @@ function fieldRules({ learning, translation }: Languages): string {
 Minimum-information principle: pick ONE sense of the word. Never combine multiple meanings into "explanation"/"translation" - if the word has several senses, choose the single most useful one.`;
 }
 
+// Self-assessed CEFR level + goal, used to aim vocabulary difficulty.
+export type Levels = { current: string; target: string };
+
+// A sentence appended to generation prompts so the model picks vocabulary at the
+// learner's band. Empty when no levels are set (keeps the old behaviour).
+function levelGuidance(levels?: Levels): string {
+  if (!levels) return "";
+  return `\n\nThe learner self-assesses as CEFR ${levels.current} and is aiming for ${levels.target}. Choose vocabulary at the appropriate next step for them: useful and challenging but learnable from ${levels.current}, trending toward ${levels.target}. Avoid words well below ${levels.current} (too easy) or well above ${levels.target} (too hard).`;
+}
+
 function cardSystemPrompt(langs: Languages): string {
   return `You are a flashcard writer for "Simple Cards", a Telegram app for learning ${langs.learning} vocabulary with spaced repetition.
 Produce ONE flashcard as a JSON object with these fields:
@@ -116,10 +126,13 @@ export async function generateCardFromImage(
   return parseGeneratedCard(content);
 }
 
-function wordOfDayPrompt(langs: Languages): string {
-  return `You are the "word of the day" picker for "Simple Cards", a Telegram app for people learning ${langs.learning} vocabulary. The user is NOT a beginner - they want to expand an already-decent vocabulary.
+function wordOfDayPrompt(langs: Languages, levels?: Levels): string {
+  const band = levels
+    ? `at the right level for a CEFR ${levels.current} learner aiming for ${levels.target} - challenging but learnable, trending toward ${levels.target}`
+    : "at UPPER-INTERMEDIATE to ADVANCED level (roughly CEFR B2-C1) - a word an educated native uses naturally but an intermediate learner likely doesn't know yet. NEVER pick basic A1-B1 vocabulary";
+  return `You are the "word of the day" picker for "Simple Cards", a Telegram app for people learning ${langs.learning} vocabulary.
 
-Pick ONE genuinely useful but non-obvious ${langs.learning} word or idiomatic expression at UPPER-INTERMEDIATE to ADVANCED level (roughly CEFR B2-C1) - a word an educated native uses naturally but an intermediate learner likely doesn't know yet. NEVER pick basic A1-B1 vocabulary. Prefer precise/expressive/idiomatic words (adjectives, phrasal verbs, idioms). Not obscure academic jargon. Vary part of speech and topic day to day. Do NOT pick any word in the given "already has" list or its close forms.
+Pick ONE genuinely useful but non-obvious ${langs.learning} word or idiomatic expression ${band}. Prefer precise/expressive/idiomatic words (adjectives, phrasal verbs, idioms). Not obscure academic jargon. Vary part of speech and topic day to day. Do NOT pick any word in the given "already has" list or its close forms.
 
 Then produce a flashcard for the picked word as a JSON object:
 ${fieldRules(langs)}
@@ -129,11 +142,12 @@ Respond ONLY with the JSON object: ${JSON_SHAPE}`;
 
 export async function generateWordOfDay(
   existingWords: string[],
-  languages: Languages
+  languages: Languages,
+  levels?: Levels
 ): Promise<GeneratedCardFields> {
   const content = await chatCompletion(
     [
-      { role: "system", content: wordOfDayPrompt(languages) },
+      { role: "system", content: wordOfDayPrompt(languages, levels) },
       {
         role: "user",
         content: existingWords.length
@@ -147,10 +161,10 @@ export async function generateWordOfDay(
   return parseGeneratedCard(content);
 }
 
-function cardSetPrompt(langs: Languages, max: number): string {
+function cardSetPrompt(langs: Languages, max: number, levels?: Levels): string {
   return `You are a vocabulary curator for "Simple Cards", an app for learning ${langs.learning} vocabulary. The user describes a set of flashcards they want in natural language — a topic, exam, situation, or level, and possibly a number of cards.
 
-Choose genuinely useful, real ${langs.learning} words or phrases that best match the request (varied, non-duplicate, no near-duplicates of each other). Honor the requested number of cards if one is given; otherwise pick about 10. NEVER produce more than ${max} cards. Do NOT include any word from the user's "already has" list.
+Choose genuinely useful, real ${langs.learning} words or phrases that best match the request (varied, non-duplicate, no near-duplicates of each other). Honor the requested number of cards if one is given; otherwise pick about 10. NEVER produce more than ${max} cards. Do NOT include any word from the user's "already has" list.${levelGuidance(levels)}
 
 For EACH chosen word produce a flashcard object with these fields:
 ${fieldRules(langs)}
@@ -163,11 +177,12 @@ export async function generateCardSet(
   request: string,
   languages: Languages,
   existingWords: string[],
-  max: number
+  max: number,
+  levels?: Levels
 ): Promise<GeneratedCardFields[]> {
   const content = await chatCompletion(
     [
-      { role: "system", content: cardSetPrompt(languages, max) },
+      { role: "system", content: cardSetPrompt(languages, max, levels) },
       {
         role: "user",
         content: [

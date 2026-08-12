@@ -80,6 +80,13 @@ export type Profile = {
   timezone: string | null;
   // Whether the daily word-of-the-day message is sent.
   wordOfDayEnabled: boolean;
+  // CEFR self-assessed level and goal.
+  currentLevel: string;
+  targetLevel: string;
+  // Whether to show the real-world word-count milestones.
+  showMilestones: boolean;
+  // Cards mature enough to count as "learned".
+  learnedCount: number;
   todayCount: number;
   streak: number;
   // { "2026-07-03": 12, ... }
@@ -95,6 +102,9 @@ export type ProfileUpdate = Partial<
     | "dailyGoal"
     | "timezone"
     | "wordOfDayEnabled"
+    | "currentLevel"
+    | "targetLevel"
+    | "showMilestones"
   >
 >;
 

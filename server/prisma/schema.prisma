@@ -28,6 +28,14 @@ model User {
   // Whether the daily "word of the day" message is sent to this user.
   wordOfDayEnabled Boolean @default(true)
 
+  // CEFR self-assessed level and goal. currentLevel A0..C2, targetLevel A1..C2.
+  // Used to aim generated vocabulary at the right difficulty band.
+  currentLevel String @default("A0")
+  targetLevel  String @default("B1")
+  // Whether to show the real-world word-count milestones (café, conversation,
+  // books, work). Off suits users who didn't start from zero.
+  showMilestones Boolean @default(true)
+
   // When the daily word-of-the-day message was last sent to this user.
   lastWordOfDayAt DateTime?
 

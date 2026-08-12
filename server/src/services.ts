@@ -8,7 +8,7 @@ import {
   generateImage,
   regenerateCard,
 } from "./llm.js";
-import type { GeneratedCardFields } from "./llm.js";
+import type { GeneratedCardFields, Levels } from "./llm.js";
 import { languageNames } from "./languages.js";
 import type { Languages } from "./languages.js";
 import { absoluteImageUrl, saveImage } from "./storage.js";
@@ -66,6 +66,18 @@ async function userLanguages(userId: string): Promise<Languages> {
   });
   return languageNames(user);
 }
+
+async function userLevels(userId: string): Promise<Levels> {
+  const user = await prisma.user.findUniqueOrThrow({
+    where: { id: userId },
+    select: { currentLevel: true, targetLevel: true },
+  });
+  return { current: user.currentLevel, target: user.targetLevel };
+}
+
+// A card counts as "learned" once its SRS interval reaches this many days - the
+// standard "mature card" threshold.
+const LEARNED_INTERVAL_DAYS = 21;
 
 export async function createCard(input: {
   userId: string;
@@ -158,11 +170,12 @@ export async function generateCardSetPreview(input: {
   max?: number;
 }): Promise<CardSetPreview[]> {
   const max = Math.min(input.max ?? 30, 30);
-  const [languages, existing] = await Promise.all([
+  const [languages, levels, existing] = await Promise.all([
     userLanguages(input.userId),
+    userLevels(input.userId),
     listUserWords(input.userId),
   ]);
-  const fieldsList = await generateCardSet(input.request, languages, existing, max);
+  const fieldsList = await generateCardSet(input.request, languages, existing, max, levels);
 
   return mapPool(fieldsList, 4, async (fields) => {
     const example = filledSentence(fields);
@@ -287,6 +300,13 @@ export type Profile = {
   timezone: string | null;
   // Whether the daily word-of-the-day message is sent.
   wordOfDayEnabled: boolean;
+  // CEFR self-assessed level and goal.
+  currentLevel: string;
+  targetLevel: string;
+  // Whether to show the real-world word-count milestones.
+  showMilestones: boolean;
+  // Cards whose SRS interval is mature enough to count as "learned".
+  learnedCount: number;
   todayCount: number;
   streak: number;
   // { "2026-07-03": 12, ... } for roughly the last ~130 days.
@@ -307,7 +327,14 @@ export async function getProfile(userId: string): Promise<Profile> {
       dailyGoal: true,
       timezone: true,
       wordOfDayEnabled: true,
+      currentLevel: true,
+      targetLevel: true,
+      showMilestones: true,
     },
+  });
+
+  const learnedCount = await prisma.card.count({
+    where: { userId, interval: { gte: LEARNED_INTERVAL_DAYS } },
   });
 
   const since = localDay(user.timezone);
@@ -340,6 +367,10 @@ export async function getProfile(userId: string): Promise<Profile> {
     dailyGoal: user.dailyGoal,
     timezone: user.timezone,
     wordOfDayEnabled: user.wordOfDayEnabled,
+    currentLevel: user.currentLevel,
+    targetLevel: user.targetLevel,
+    showMilestones: user.showMilestones,
+    learnedCount,
     todayCount,
     streak,
     activity,
@@ -355,6 +386,9 @@ export async function updateProfile(
     dailyGoal?: number;
     timezone?: string;
     wordOfDayEnabled?: boolean;
+    currentLevel?: string;
+    targetLevel?: string;
+    showMilestones?: boolean;
   }
 ) {
   await prisma.user.update({ where: { id: userId }, data });

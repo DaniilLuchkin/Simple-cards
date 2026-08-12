@@ -65,8 +65,17 @@ export async function sendWordOfDay(
   bot: Bot,
   user: { id: string; telegramId: bigint; learningLanguage: string; translationLanguage: string }
 ) {
-  const existingWords = await listUserWords(user.id);
-  const fields = await generateWordOfDay(existingWords, languageNames(user));
+  const [existingWords, levels] = await Promise.all([
+    listUserWords(user.id),
+    prisma.user.findUniqueOrThrow({
+      where: { id: user.id },
+      select: { currentLevel: true, targetLevel: true },
+    }),
+  ]);
+  const fields = await generateWordOfDay(existingWords, languageNames(user), {
+    current: levels.currentLevel,
+    target: levels.targetLevel,
+  });
 
   const sent = await bot.api.sendMessage(Number(user.telegramId), formatMessage(fields), {
     parse_mode: "HTML",

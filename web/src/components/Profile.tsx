@@ -4,12 +4,16 @@ import { usePrefs, PALETTES } from "../lib/prefs";
 import type { Palette } from "../lib/prefs";
 import { LanguageSelect } from "./LanguageSelect";
 import { ActivityHeatmap } from "./ActivityHeatmap";
+import { LearnedProgress } from "./LearnedProgress";
 
 const PALETTE_LABEL: Record<Palette, "bgLavender" | "bgMint" | "bgSky"> = {
   lavender: "bgLavender",
   mint: "bgMint",
   sky: "bgSky",
 };
+
+const CURRENT_LEVELS = ["A0", "A1", "A2", "B1", "B2", "C1", "C2"];
+const TARGET_LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"];
 
 export function Profile({
   profile,
@@ -47,6 +51,66 @@ export function Profile({
           </div>
         </div>
         {goalMet && <p className="mt-3 text-center text-sm font-semibold text-emerald-600">{t("goalMet")}</p>}
+      </div>
+
+      {/* Words learned + real-world milestones */}
+      <LearnedProgress learned={profile.learnedCount} showMilestones={profile.showMilestones} />
+
+      {/* My level & goal */}
+      <div className="rounded-2xl border-2 border-black bg-surface p-4 shadow-toon">
+        <p className="mb-3 text-sm text-ink">{t("myLevel")}</p>
+        <div className="flex gap-2">
+          <label className="flex flex-1 flex-col gap-1">
+            <span className="text-xs font-semibold text-muted">{t("levelNow")}</span>
+            <select
+              value={profile.currentLevel}
+              onChange={(e) => onUpdate({ currentLevel: e.target.value })}
+              className="rounded-lg border-2 border-black bg-white px-2 py-1.5 text-sm font-semibold text-ink outline-none"
+            >
+              {CURRENT_LEVELS.map((l) => (
+                <option key={l} value={l}>
+                  {l}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-1 flex-col gap-1">
+            <span className="text-xs font-semibold text-muted">{t("levelGoal")}</span>
+            <select
+              value={profile.targetLevel}
+              onChange={(e) => onUpdate({ targetLevel: e.target.value })}
+              className="rounded-lg border-2 border-black bg-white px-2 py-1.5 text-sm font-semibold text-ink outline-none"
+            >
+              {TARGET_LEVELS.map((l) => (
+                <option key={l} value={l}>
+                  {l}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <p className="mt-2 text-xs text-muted">{t("levelHint")}</p>
+      </div>
+
+      {/* Show word-count milestones on/off */}
+      <div className="flex items-center justify-between rounded-2xl border-2 border-black bg-surface px-4 py-3 shadow-toon">
+        <span className="text-sm text-ink">{t("showMilestonesLabel")}</span>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={profile.showMilestones}
+          aria-label={t("showMilestonesLabel")}
+          onClick={() => onUpdate({ showMilestones: !profile.showMilestones })}
+          className={`relative h-8 w-14 rounded-full border-2 border-black shadow-toon-sm transition-colors ${
+            profile.showMilestones ? "bg-mint" : "bg-white"
+          }`}
+        >
+          <span
+            className={`absolute top-1/2 h-5 w-5 -translate-y-1/2 rounded-full border-2 border-black bg-white transition-all ${
+              profile.showMilestones ? "left-[26px]" : "left-[2px]"
+            }`}
+          />
+        </button>
       </div>
 
       {/* Activity heatmap */}
