@@ -164,16 +164,19 @@ bot.callbackQuery("wod:add", async (ctx) => {
   }
 
   try {
+    // Answer and drop the buttons up front: drawing the card illustration below
+    // can take longer than Telegram's ~10s callback-answer window.
+    await ctx.answerCallbackQuery({ text: "Добавляю…" });
+    await ctx.editMessageReplyMarkup();
+
     const user = await userFromCtx(ctx);
     await createCardFromFields({ userId: user.id, fields });
-    await ctx.answerCallbackQuery({ text: "Добавлено!" });
-    await ctx.editMessageReplyMarkup(); // drop the buttons
     await ctx.reply(`Готово! Карточка для «${fields.headword}» добавлена.`, {
       reply_markup: miniAppKeyboard,
     });
   } catch (err) {
     console.error("Failed to add word of day", err);
-    await ctx.answerCallbackQuery({ text: "Не получилось добавить. Попробуй ещё раз." });
+    await ctx.reply("Не получилось добавить карточку. Попробуй ещё раз чуть позже.");
   }
 });
 
@@ -250,8 +253,12 @@ bot.on("message:text", async (ctx) => {
     return;
   }
 
-  const statusMsg = await ctx.reply("Генерирую карточку…");
   const imagePath = pendingImageByChat.get(ctx.chat.id);
+  // Without a photo of their own we also draw an illustration, which takes a
+  // few extra seconds - say so.
+  const statusMsg = await ctx.reply(
+    imagePath ? "Генерирую карточку…" : "Генерирую карточку и картинку…"
+  );
   const card = await generateCardAndReply(ctx, statusMsg.message_id, { word, example, imagePath });
   // Keep the pending image on failure so the user can just retry the word.
   if (card) pendingImageByChat.delete(ctx.chat.id);

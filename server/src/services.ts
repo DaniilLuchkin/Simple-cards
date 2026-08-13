@@ -92,6 +92,22 @@ async function userLevels(userId: string): Promise<Levels> {
 // standard "mature card" threshold.
 const LEARNED_INTERVAL_DAYS = 21;
 
+// Every new card gets an illustration, whichever flow created it (bot chat,
+// translator, word of the day, AI set). Best-effort: a failed image must never
+// fail card creation, the card just shows without one.
+async function imageForNewCard(fields: GeneratedCardFields): Promise<string | null> {
+  try {
+    return await generateCardImageFile({
+      word: fields.headword,
+      example: filledSentence(fields),
+      explanation: fields.explanation,
+    });
+  } catch (err) {
+    console.error("Card image generation failed", err);
+    return null;
+  }
+}
+
 export async function createCard(input: {
   userId: string;
   word: string;
@@ -106,16 +122,23 @@ export async function createCard(input: {
     languages: await userLanguages(input.userId),
   });
 
+  // The user's own photo wins; otherwise draw one for the word.
+  const imagePath = input.imagePath ?? (await imageForNewCard(fields));
+
   return prisma.card.create({
-    data: { userId: input.userId, ...cardColumns(fields), imageUrl: input.imagePath },
+    data: { userId: input.userId, ...cardColumns(fields), imageUrl: imagePath },
   });
 }
 
 // For flows where the fields were already generated (e.g. accepting the word
-// of the day) - no LLM round-trip.
-export function createCardFromFields(input: { userId: string; fields: GeneratedCardFields }) {
+// of the day) - no card-text LLM round-trip.
+export async function createCardFromFields(input: {
+  userId: string;
+  fields: GeneratedCardFields;
+}) {
+  const imagePath = await imageForNewCard(input.fields);
   return prisma.card.create({
-    data: { userId: input.userId, ...cardColumns(input.fields) },
+    data: { userId: input.userId, ...cardColumns(input.fields), imageUrl: imagePath },
   });
 }
 
@@ -190,21 +213,13 @@ export async function generateCardSetPreview(input: {
   ]);
   const fieldsList = await generateCardSet(input.request, languages, existing, max, levels);
 
-  return mapPool(fieldsList, 4, async (fields) => {
-    const example = filledSentence(fields);
-    let imagePath: string | null = null;
-    try {
-      imagePath = await generateCardImageFile({
-        word: fields.headword,
-        example,
-        explanation: fields.explanation,
-      });
-    } catch (err) {
-      // A failed image shouldn't drop the card - it just shows without one.
-      console.error("Preview image generation failed", err);
-    }
-    return { word: fields.headword, translation: fields.translation, example, imagePath, fields };
-  });
+  return mapPool(fieldsList, 4, async (fields) => ({
+    word: fields.headword,
+    translation: fields.translation,
+    example: filledSentence(fields),
+    imagePath: await imageForNewCard(fields),
+    fields,
+  }));
 }
 
 // Persists the cards the user chose to keep from an AI-set preview.
