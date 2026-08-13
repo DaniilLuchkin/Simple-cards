@@ -94,10 +94,35 @@ export function SessionStart({
             >
               ▶ {t("play")} · {sessionSize}
             </button>
-            {picking ? (
+            {/* Two jobs, two buttons: play now with the remembered length, or
+                open the picker to change it. */}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => onPlayTimed(seconds)}
+                className="flex-1 rounded-2xl border-2 border-black bg-butter px-4 py-3 text-base font-bold text-ink shadow-toon-sm"
+              >
+                ⏱ {t("playTimed")} · {formatDuration(seconds, t("timedLeft"))}
+              </button>
+              <button
+                type="button"
+                onClick={() => setPicking((v) => !v)}
+                aria-expanded={picking}
+                aria-label={t("timedLength")}
+                className={`w-12 shrink-0 rounded-2xl border-2 border-black text-lg shadow-toon-sm ${
+                  picking ? "bg-sky" : "bg-white"
+                }`}
+              >
+                ⚙
+              </button>
+            </div>
+
+            {bestPace > 0 && <p className="px-1 text-[11px] text-muted">{bestLabel}</p>}
+
+            {picking && (
               <div className="flex flex-col gap-2 rounded-2xl border-2 border-black bg-surface p-4 shadow-toon-sm">
                 <div className="flex items-baseline justify-between">
-                  <span className="text-sm font-semibold text-ink">⏱ {t("playTimed")}</span>
+                  <span className="text-sm font-semibold text-ink">{t("timedLength")}</span>
                   <span className="text-lg font-bold tabular-nums text-ink">
                     {formatDuration(seconds, t("timedLeft"))}
                   </span>
@@ -109,33 +134,14 @@ export function SessionStart({
                   step={STEP_SECONDS}
                   value={seconds}
                   onChange={(e) => setSeconds(Number(e.target.value))}
-                  aria-label={t("playTimed")}
+                  aria-label={t("timedLength")}
                   className="w-full accent-black"
                 />
                 <div className="flex justify-between text-[11px] text-muted">
                   <span>{formatDuration(MIN_SECONDS, t("timedLeft"))}</span>
-                  {bestPace > 0 && <span>{bestLabel}</span>}
                   <span>{formatDuration(MAX_SECONDS, t("timedLeft"))}</span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => onPlayTimed(seconds)}
-                  className="rounded-xl border-2 border-black bg-butter px-4 py-2.5 text-base font-bold text-ink shadow-toon-sm"
-                >
-                  ⏱ {t("play")} · {formatDuration(seconds, t("timedLeft"))}
-                </button>
               </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setPicking(true)}
-                className="rounded-2xl border-2 border-black bg-butter px-4 py-3 text-base font-bold text-ink shadow-toon-sm"
-              >
-                ⏱ {t("playTimed")} · {formatDuration(seconds, t("timedLeft"))}
-                {bestPace > 0 && (
-                  <span className="ml-2 text-xs font-semibold opacity-70">{bestLabel}</span>
-                )}
-              </button>
             )}
           </>
         ) : (
