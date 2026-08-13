@@ -36,14 +36,27 @@ function sm2Snapshot(card: Card): Sm2Snapshot {
 
 type UndoInfo = { card: Card; snapshot: Sm2Snapshot; practice: boolean };
 
-// How long a timed round lasts, and where its personal best is kept (a single
-// local number - no server field needed).
-const TIMED_SECONDS = 60;
-const TIMED_BEST_KEY = "timedBest";
+// Timed rounds: 60s by default, adjustable 30s..5min from the lobby.
+const TIMED_DEFAULT_SECONDS = 60;
+const TIMED_SECONDS_KEY = "timedSeconds";
+const TIMED_BESTS_KEY = "timedBests";
 
-function readTimedBest(): number {
-  const raw = Number(localStorage.getItem(TIMED_BEST_KEY));
-  return Number.isFinite(raw) && raw > 0 ? raw : 0;
+function readTimedSeconds(): number {
+  const raw = Number(localStorage.getItem(TIMED_SECONDS_KEY));
+  return Number.isFinite(raw) && raw >= 30 && raw <= 300 ? raw : TIMED_DEFAULT_SECONDS;
+}
+
+// Bests are kept PER duration - a 5-minute run would otherwise permanently
+// beat every 30-second one and the record would stop meaning anything.
+type TimedBests = Record<string, number>;
+
+function readTimedBests(): TimedBests {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(TIMED_BESTS_KEY) ?? "{}");
+    return parsed && typeof parsed === "object" ? (parsed as TimedBests) : {};
+  } catch {
+    return {};
+  }
 }
 
 export type SessionMode = "normal" | "timed";
@@ -54,6 +67,8 @@ type SessionState = {
   size: number;
   /** Wall-clock end for a timed round; null for a normal one. */
   endsAt: number | null;
+  /** The chosen length of a timed round, so the countdown bar can scale. */
+  totalSeconds: number;
   done: number;
   correct: number;
   combo: number;
@@ -88,7 +103,8 @@ export function App() {
   // Review is played in rounds: lobby -> playing -> summary.
   const [session, setSession] = useState<SessionState | null>(null);
   const [summary, setSummary] = useState<SessionResult | null>(null);
-  const [timedBest, setTimedBest] = useState(readTimedBest);
+  const [timedSeconds, setTimedSeconds] = useState(readTimedSeconds);
+  const [timedBests, setTimedBests] = useState<TimedBests>(readTimedBests);
   // Ticks only while a timed round is live, to drive the countdown.
   const [now, setNow] = useState(() => Date.now());
 
@@ -187,13 +203,18 @@ export function App() {
     if (over) await finishSession(next);
   }
 
-  function startSession(mode: SessionMode = "normal") {
+  function startSession(mode: SessionMode = "normal", seconds = timedSeconds) {
     const size = plannedSessionSize(profile, dueCards?.length ?? 0);
+    if (mode === "timed" && seconds !== timedSeconds) {
+      setTimedSeconds(seconds);
+      localStorage.setItem(TIMED_SECONDS_KEY, String(seconds));
+    }
     setSummary(null);
     setSession({
       mode,
       size,
-      endsAt: mode === "timed" ? Date.now() + TIMED_SECONDS * 1000 : null,
+      endsAt: mode === "timed" ? Date.now() + seconds * 1000 : null,
+      totalSeconds: seconds,
       done: 0,
       correct: 0,
       combo: 0,
@@ -205,10 +226,12 @@ export function App() {
   // and switch to the summary screen.
   async function finishSession(state: SessionState) {
     const timed = state.mode === "timed";
-    const record = timed && state.done > timedBest;
+    const key = String(state.totalSeconds);
+    const record = timed && state.done > (timedBests[key] ?? 0);
     if (record) {
-      setTimedBest(state.done);
-      localStorage.setItem(TIMED_BEST_KEY, String(state.done));
+      const next = { ...timedBests, [key]: state.done };
+      setTimedBests(next);
+      localStorage.setItem(TIMED_BESTS_KEY, JSON.stringify(next));
     }
 
     setSession(null);
@@ -356,7 +379,7 @@ export function App() {
               sessionSize={session?.size ?? 0}
               timed={session?.mode === "timed"}
               secondsLeft={session?.endsAt ? Math.max(0, (session.endsAt - now) / 1000) : 0}
-              totalSeconds={TIMED_SECONDS}
+              totalSeconds={session?.totalSeconds ?? TIMED_DEFAULT_SECONDS}
               onUndo={handleUndo}
               onStartPractice={startPractice}
               onGraded={handleGraded}
@@ -371,10 +394,10 @@ export function App() {
               profile={profile}
               dueCount={dueCards?.length ?? 0}
               sessionSize={plannedSessionSize(profile, dueCards?.length ?? 0)}
-              timedSeconds={TIMED_SECONDS}
-              timedBest={timedBest}
+              timedSeconds={timedSeconds}
+              timedBests={timedBests}
               onPlay={() => startSession("normal")}
-              onPlayTimed={() => startSession("timed")}
+              onPlayTimed={(seconds) => startSession("timed", seconds)}
               onPractice={startPractice}
             />
           )

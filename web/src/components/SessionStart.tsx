@@ -1,6 +1,20 @@
+import { useState } from "react";
 import type { Profile } from "../lib/api";
 import { usePrefs } from "../lib/prefs";
 import { QuestList } from "./QuestList";
+
+// Timed-round length: 30s … 5min, in 15s steps.
+const MIN_SECONDS = 30;
+const MAX_SECONDS = 300;
+const STEP_SECONDS = 15;
+
+/** 45 -> "45s", 90 -> "1:30" — short values read better as plain seconds. */
+export function formatDuration(seconds: number, secondsLabel: string): string {
+  if (seconds < 60) return `${seconds}${secondsLabel}`;
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
 
 // The Review tab's lobby: what's waiting, today's quests, and the big Play
 // button that starts a round. Having an explicit start makes a session feel
@@ -10,7 +24,7 @@ export function SessionStart({
   dueCount,
   sessionSize,
   timedSeconds,
-  timedBest,
+  timedBests,
   onPlay,
   onPlayTimed,
   onPractice,
@@ -18,16 +32,24 @@ export function SessionStart({
   profile: Profile | null;
   dueCount: number;
   sessionSize: number;
+  /** Last chosen timed length (persisted by the caller). */
   timedSeconds: number;
-  timedBest: number;
+  /** Personal bests keyed by duration in seconds. */
+  timedBests: Record<string, number>;
   onPlay: () => void;
-  onPlayTimed: () => void;
+  onPlayTimed: (seconds: number) => void;
   onPractice: () => void;
 }) {
   const { t } = usePrefs();
   const goal = profile?.dailyGoal ?? 10;
   const done = profile?.todayCount ?? 0;
   const pct = Math.min(100, Math.round((done / goal) * 100));
+
+  // Tapping the timed button opens the length picker rather than starting
+  // straight away, so the duration is always a deliberate choice.
+  const [picking, setPicking] = useState(false);
+  const [seconds, setSeconds] = useState(timedSeconds);
+  const best = timedBests[String(seconds)] ?? 0;
 
   return (
     <div className="-mx-2 flex h-full flex-col gap-4 overflow-y-auto px-2 pb-6 pt-1">
@@ -76,19 +98,55 @@ export function SessionStart({
             >
               ▶ {t("play")} · {sessionSize}
             </button>
-            <button
-              type="button"
-              onClick={onPlayTimed}
-              className="rounded-2xl border-2 border-black bg-butter px-4 py-3 text-base font-bold text-ink shadow-toon-sm"
-            >
-              ⏱ {t("playTimed")} · {timedSeconds}
-              {t("timedLeft")}
-              {timedBest > 0 && (
-                <span className="ml-2 text-xs font-semibold opacity-70">
-                  {t("record")}: {timedBest}
-                </span>
-              )}
-            </button>
+            {picking ? (
+              <div className="flex flex-col gap-2 rounded-2xl border-2 border-black bg-surface p-4 shadow-toon-sm">
+                <div className="flex items-baseline justify-between">
+                  <span className="text-sm font-semibold text-ink">⏱ {t("playTimed")}</span>
+                  <span className="text-lg font-bold tabular-nums text-ink">
+                    {formatDuration(seconds, t("timedLeft"))}
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={MIN_SECONDS}
+                  max={MAX_SECONDS}
+                  step={STEP_SECONDS}
+                  value={seconds}
+                  onChange={(e) => setSeconds(Number(e.target.value))}
+                  aria-label={t("playTimed")}
+                  className="w-full accent-black"
+                />
+                <div className="flex justify-between text-[11px] text-muted">
+                  <span>{formatDuration(MIN_SECONDS, t("timedLeft"))}</span>
+                  {best > 0 && (
+                    <span>
+                      {t("record")}: {best}
+                    </span>
+                  )}
+                  <span>{formatDuration(MAX_SECONDS, t("timedLeft"))}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onPlayTimed(seconds)}
+                  className="rounded-xl border-2 border-black bg-butter px-4 py-2.5 text-base font-bold text-ink shadow-toon-sm"
+                >
+                  ⏱ {t("play")} · {formatDuration(seconds, t("timedLeft"))}
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setPicking(true)}
+                className="rounded-2xl border-2 border-black bg-butter px-4 py-3 text-base font-bold text-ink shadow-toon-sm"
+              >
+                ⏱ {t("playTimed")} · {formatDuration(seconds, t("timedLeft"))}
+                {best > 0 && (
+                  <span className="ml-2 text-xs font-semibold opacity-70">
+                    {t("record")}: {best}
+                  </span>
+                )}
+              </button>
+            )}
           </>
         ) : (
           <div className="rounded-2xl border-2 border-black bg-surface p-5 text-center shadow-toon">
