@@ -24,9 +24,15 @@ type Prefs = {
   theme: Theme;
   uiLang: string;
   palette: Palette;
+  // What the card front shows as the prompt, so it's clear WHICH word is being
+  // tested. Both default on; either can be turned off in Profile.
+  frontTranslation: boolean;
+  frontDefinition: boolean;
   toggleTheme: () => void;
   setUiLang: (lang: string) => void;
   setPalette: (palette: Palette) => void;
+  setFrontTranslation: (on: boolean) => void;
+  setFrontDefinition: (on: boolean) => void;
   t: (key: StringKey) => string;
 };
 
@@ -49,6 +55,18 @@ export function PrefsProvider({ children }: { children: ReactNode }) {
     const saved = localStorage.getItem("palette");
     return saved === "mint" || saved === "sky" ? saved : "lavender";
   });
+  // Absent = on, so both prompts show until the user turns one off.
+  const [frontTranslation, setFrontTranslationState] = useState(
+    () => localStorage.getItem("frontTranslation") !== "0"
+  );
+  const [frontDefinition, setFrontDefinition] = useState(
+    () => localStorage.getItem("frontDefinition") !== "0"
+  );
+
+  useEffect(() => {
+    localStorage.setItem("frontTranslation", frontTranslation ? "1" : "0");
+    localStorage.setItem("frontDefinition", frontDefinition ? "1" : "0");
+  }, [frontTranslation, frontDefinition]);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
@@ -75,9 +93,13 @@ export function PrefsProvider({ children }: { children: ReactNode }) {
     theme,
     uiLang,
     palette,
+    frontTranslation,
+    frontDefinition,
     toggleTheme: () => setTheme((v) => (v === "dark" ? "light" : "dark")),
     setUiLang: setUiLangState,
     setPalette: setPaletteState,
+    setFrontTranslation: setFrontTranslationState,
+    setFrontDefinition,
     // Per-key fallback to English so partial translations never show blanks.
     t: (key) => dict[key] ?? BASE_DICT[key],
   };

@@ -57,6 +57,33 @@ function looksLikeMultipleSenses(meaning: string): boolean {
   return false;
 }
 
+/**
+ * Retrieval scaffold for the cloze gap: the first letter of each word plus one
+ * dot per remaining letter, e.g. "give up" -> "g··· ··". A blank alone can't be
+ * reconstructed from context, while the skeleton makes a half-known word
+ * retrievable without handing over the spelling. Non-letters (hyphens,
+ * apostrophes) are kept so the shape of the word still reads.
+ */
+export function wordSkeleton(headword: string): string {
+  return headword
+    .split(/(\s+)/) // keep the separators so spacing survives
+    .map((chunk) => {
+      if (/^\s+$/.test(chunk) || !chunk) return chunk;
+      let seenLetter = false;
+      return [...chunk]
+        .map((ch) => {
+          if (!/\p{L}/u.test(ch)) return ch; // hyphen, apostrophe…
+          if (!seenLetter) {
+            seenLetter = true;
+            return ch;
+          }
+          return "·";
+        })
+        .join("");
+    })
+    .join("");
+}
+
 /** Splits a `{{gap}}` sentence into the text before and after the gap. */
 export function splitCloze(sentence: string): { before: string; after: string } {
   const idx = sentence.indexOf(GAP_TOKEN);

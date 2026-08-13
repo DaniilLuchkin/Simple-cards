@@ -5,7 +5,7 @@ import { speak } from "../../lib/speak";
 import { haptic } from "../../lib/telegram";
 import { GRADES, formatInterval, previewIntervals, schedule } from "../../lib/srs";
 import type { Grade, SrsState } from "../../lib/srs";
-import { splitCloze } from "../../lib/srsCard";
+import { splitCloze, wordSkeleton } from "../../lib/srsCard";
 import type { SrsCard as SrsCardData } from "../../lib/srsCard";
 import { deriveCloze } from "../../lib/srsAdapter";
 import { localizePos } from "../../lib/pos";
@@ -24,6 +24,11 @@ const GRADE_LABEL: Record<Grade, "gradeAgain" | "gradeHard" | "gradeGood" | "gra
   good: "gradeGood",
   easy: "gradeEasy",
 };
+
+// Below this interval a card counts as still weak, so it's tested as
+// recognition (word -> meaning). Matches the server's "learned" threshold
+// (LEARNED_INTERVAL_DAYS in services.ts).
+const MATURE_INTERVAL_DAYS = 21;
 
 const parseList = (s: string) =>
   s
@@ -103,12 +108,20 @@ export function SrsCard({
   onUploadImage?: (file: File) => void;
   onGenerateImage?: () => Promise<void> | void;
 }) {
-  const { t, uiLang } = usePrefs();
+  const { t, uiLang, frontTranslation, frontDefinition } = usePrefs();
   const reduceMotion = usePrefersReducedMotion();
   const [flipped, setFlipped] = useState(defaultFlipped);
   const [hintStep, setHintStep] = useState(0); // 0 none -> 1 pos -> 2 first letters
   const [editing, setEditing] = useState(false);
   const suppressClick = useRef(false);
+
+  // A card you don't know yet is tested the easy way round (word -> meaning);
+  // once it's mature it flips to production (meaning -> word). Recall is only a
+  // fair test when you can tell which word is being asked, and for a weak word
+  // the sentence alone can't carry that.
+  const recognition = card.srs.interval < MATURE_INTERVAL_DAYS;
+  const showsPrompt =
+    (frontTranslation && Boolean(card.meaning)) || (frontDefinition && Boolean(card.explanation));
 
   const cloze = splitCloze(card.sentence);
   const intervals = previewIntervals(card.srs);
@@ -222,72 +235,115 @@ export function SrsCard({
         <div className={faceBase}>
           {header(t("srsFront"))}
 
-          <p className="font-serif text-2xl leading-relaxed text-ink">
-            {cloze.before}
-            <span className="mx-0.5 inline-flex min-w-[3.5rem] items-center justify-center rounded-md border-2 border-black bg-gap px-2 align-baseline text-ink">
-              …
-            </span>
-            {cloze.after}
-          </p>
-
-          {/* Image takes only the leftover space so audio + grades stay visible. */}
-          {card.imageUrl && (
-            <div className="flex min-h-0 flex-1 items-center justify-center">
-              <img
-                src={card.imageUrl}
-                alt=""
-                className="max-h-full w-auto max-w-full rounded-2xl border-2 border-black object-contain"
-                onError={(e) => (e.currentTarget.style.display = "none")}
-              />
-            </div>
-          )}
-
-          <div className={`flex flex-col gap-3 ${card.imageUrl ? "" : "mt-auto"}`}>
-            {/* Hint on the left (the hint itself replaces the button in place, so
-                the row keeps its height and never resizes the image); audio
-                pinned to the right. */}
-            <div className="flex items-center justify-between gap-3">
-              {hintStep === 0 ? (
+          {recognition ? (
+            /* Weak card, tested the easy way round: the word is given, recall
+               what it means. The image stays hidden here - it depicts the
+               meaning, which is exactly the answer. */
+            <>
+              <div className="flex flex-wrap items-center gap-3">
+                <h2 className="font-serif text-3xl leading-none text-ink">{card.headword}</h2>
+                {card.ipa && (
+                  <span className="font-serif text-base italic text-muted">{card.ipa}</span>
+                )}
                 <button
                   type="button"
-                  onClick={cycleHint}
-                  className="rounded-full border-2 border-dashed border-black px-4 py-2 text-sm font-semibold text-ink"
+                  aria-label={t("srsListen")}
+                  onClick={(e) => {
+                    stop(e);
+                    speak(card.headword, { audioUrl: card.audioUrl, lang: learningLang });
+                  }}
+                  className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-black bg-white shadow-toon-sm"
                 >
-                  {t("srsHint")}
+                  🔊
                 </button>
-              ) : (
-                <div
-                  role="button"
-                  onClick={cycleHint}
-                  className="flex cursor-pointer select-none flex-wrap items-center gap-2 text-sm"
-                >
-                  {card.pos && (
-                    <span className="rounded-full border border-black px-3 py-1 text-muted">
-                      {localizePos(card.pos, uiLang)}
-                    </span>
+              </div>
+
+              <p className="font-serif text-xl leading-relaxed text-muted">
+                {cloze.before}
+                <span className="font-semibold text-ink">{card.headword}</span>
+                {cloze.after}
+              </p>
+
+              <p className="mt-auto text-sm text-muted">{t("recallMeaning")}</p>
+              {gradeRow()}
+            </>
+          ) : (
+            /* Mature card: recall the word from its meaning. The prompt names
+               the target so you always know WHICH word is being asked, and the
+               gap shows a skeleton so a half-known word is retrievable. */
+            <>
+              {/* Skipped entirely when both prompts are off, so the label never
+                  dangles over nothing. */}
+              {showsPrompt && (
+                <div className="flex flex-col gap-1">
+                  <span className={sectionLabel}>{t("whichWord")}</span>
+                  {frontTranslation && card.meaning && (
+                    <p className="text-xl font-semibold leading-snug text-ink">{card.meaning}</p>
                   )}
-                  <span className="rounded-full border border-black px-3 py-1 font-serif text-ink">
-                    {card.headword.slice(0, hintStep >= 2 ? Math.min(3, card.headword.length) : 1)}…
-                  </span>
+                  {frontDefinition && card.explanation && (
+                    <p className="text-sm leading-snug text-muted">{card.explanation}</p>
+                  )}
                 </div>
               )}
-              <button
-                type="button"
-                aria-label={t("srsListen")}
-                onClick={(e) => {
-                  stop(e);
-                  speak(cloze.before + card.headword + cloze.after, {
-                    audioUrl: card.audioUrl,
-                    lang: learningLang,
-                  });
-                }}
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 border-black bg-white text-lg shadow-toon-sm"
-              >
-                🔊
-              </button>
-            </div>
-            {gradeRow()}
-          </div>
+
+              <p className="font-serif text-2xl leading-relaxed text-ink">
+                {cloze.before}
+                <span className="mx-0.5 inline-flex min-w-[3.5rem] items-center justify-center rounded-md border-2 border-black bg-gap px-2 align-baseline tracking-[0.15em] text-ink">
+                  {wordSkeleton(card.headword)}
+                </span>
+                {cloze.after}
+              </p>
+
+              {/* Image takes only the leftover space so the hint + grades stay
+                  visible. It cues the meaning, not the spelling, so it's safe
+                  on this face. */}
+              {card.imageUrl && (
+                <div className="flex min-h-0 flex-1 items-center justify-center">
+                  <img
+                    src={card.imageUrl}
+                    alt=""
+                    className="max-h-full w-auto max-w-full rounded-2xl border-2 border-black object-contain"
+                    onError={(e) => (e.currentTarget.style.display = "none")}
+                  />
+                </div>
+              )}
+
+              <div className={`flex flex-col gap-3 ${card.imageUrl ? "" : "mt-auto"}`}>
+                {/* No audio button on this face: it would speak the answer. The
+                    hint replaces its own button in place, so the row keeps its
+                    height and never resizes the image. */}
+                {hintStep === 0 ? (
+                  <button
+                    type="button"
+                    onClick={cycleHint}
+                    className="self-start rounded-full border-2 border-dashed border-black px-4 py-2 text-sm font-semibold text-ink"
+                  >
+                    {t("srsHint")}
+                  </button>
+                ) : (
+                  <div
+                    role="button"
+                    onClick={cycleHint}
+                    className="flex cursor-pointer select-none flex-wrap items-center gap-2 text-sm"
+                  >
+                    {card.pos && (
+                      <span className="rounded-full border border-black px-3 py-1 text-muted">
+                        {localizePos(card.pos, uiLang)}
+                      </span>
+                    )}
+                    <span className="rounded-full border border-black px-3 py-1 font-serif text-ink">
+                      {card.headword.slice(
+                        0,
+                        hintStep >= 2 ? Math.min(3, card.headword.length) : 1
+                      )}
+                      …
+                    </span>
+                  </div>
+                )}
+                {gradeRow()}
+              </div>
+            </>
+          )}
         </div>
 
         {/* ---------- BACK ---------- */}

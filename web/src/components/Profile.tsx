@@ -24,7 +24,19 @@ export function Profile({
   profile: ProfileData;
   onUpdate: (update: ProfileUpdate) => void;
 }) {
-  const { t, uiLang, setUiLang, palette, setPalette, theme, toggleTheme } = usePrefs();
+  const {
+    t,
+    uiLang,
+    setUiLang,
+    palette,
+    setPalette,
+    theme,
+    toggleTheme,
+    frontTranslation,
+    frontDefinition,
+    setFrontTranslation,
+    setFrontDefinition,
+  } = usePrefs();
   const [goal, setGoal] = useState(profile.dailyGoal);
 
   const goalMet = profile.todayCount >= profile.dailyGoal;
@@ -153,6 +165,23 @@ export function Profile({
               +
             </button>
           </div>
+        </div>
+      </Card>
+
+      {/* Card front: what identifies the word being tested */}
+      <Card>
+        <SectionTitle>{t("cardSection")}</SectionTitle>
+        <div className="flex flex-col gap-3">
+          <SwitchRow
+            label={t("frontTranslation")}
+            checked={frontTranslation}
+            onToggle={() => setFrontTranslation(!frontTranslation)}
+          />
+          <SwitchRow
+            label={t("frontDefinition")}
+            checked={frontDefinition}
+            onToggle={() => setFrontDefinition(!frontDefinition)}
+          />
         </div>
       </Card>
 
