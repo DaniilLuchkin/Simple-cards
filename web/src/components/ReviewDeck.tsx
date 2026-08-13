@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import type { Card, Grade } from "../lib/api";
 import { api } from "../lib/api";
 import { usePrefs } from "../lib/prefs";
@@ -13,6 +14,9 @@ export function ReviewDeck({
   practice,
   learningLang,
   canUndo,
+  combo,
+  sessionDone,
+  sessionSize,
   onUndo,
   onStartPractice,
   onGraded,
@@ -26,6 +30,11 @@ export function ReviewDeck({
   practice: boolean;
   learningLang: string;
   canUndo: boolean;
+  /** Current correct-answer streak within this round (0 = no combo). */
+  combo: number;
+  /** Cards graded so far in this round, and the round's length. */
+  sessionDone: number;
+  sessionSize: number;
   onUndo: () => void;
   onStartPractice: () => void;
   onGraded: (card: Card, grade: Grade) => void;
@@ -97,7 +106,11 @@ export function ReviewDeck({
 
   return (
     <div className="flex h-full flex-col gap-3">
-      {practice && <p className="text-center text-xs text-oncanvas opacity-70">{t("practiceNote")}</p>}
+      {practice ? (
+        <p className="text-center text-xs text-oncanvas opacity-70">{t("practiceNote")}</p>
+      ) : (
+        <SessionBar done={sessionDone} size={sessionSize} combo={combo} />
+      )}
 
       <div className="min-h-0 flex-1">
         <SrsCard
@@ -130,6 +143,52 @@ export function ReviewDeck({
           {busy ? t("generating") : t("regenerate")}
         </button>
       </div>
+    </div>
+  );
+}
+
+// Round progress: one pip per card plus the live combo badge. Pips stay a row
+// of dots up to a point, then collapse to a bar so long rounds still fit.
+function SessionBar({ done, size, combo }: { done: number; size: number; combo: number }) {
+  const pct = size > 0 ? Math.min(100, Math.round((done / size) * 100)) : 0;
+
+  return (
+    <div className="flex items-center gap-3 px-1">
+      {size <= 12 ? (
+        <div className="flex flex-1 items-center gap-1">
+          {Array.from({ length: size }, (_, i) => (
+            <span
+              key={i}
+              className={`h-2.5 flex-1 rounded-full border-2 border-black transition-colors ${
+                i < done ? "bg-mint" : "bg-white"
+              }`}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="h-2.5 flex-1 overflow-hidden rounded-full border-2 border-black bg-white">
+          <div className="h-full bg-mint transition-all" style={{ width: `${pct}%` }} />
+        </div>
+      )}
+
+      <span className="shrink-0 text-xs font-semibold text-oncanvas opacity-70">
+        {done}/{size}
+      </span>
+
+      <AnimatePresence>
+        {combo >= 2 && (
+          <motion.span
+            key={combo}
+            initial={{ scale: 0.6, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.6, opacity: 0 }}
+            transition={{ type: "spring", stiffness: 400, damping: 15 }}
+            className="shrink-0 rounded-full border-2 border-black bg-butter px-2 py-0.5 text-xs font-bold text-ink shadow-toon-sm"
+          >
+            🔥 x{combo}
+          </motion.span>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

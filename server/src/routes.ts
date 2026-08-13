@@ -7,6 +7,7 @@ import { randomUUID } from "node:crypto";
 import {
   createCard,
   createCardFromImage,
+  completeSession,
   generateCardImageFile,
   generateCardSetPreview,
   saveGeneratedCards,
@@ -14,10 +15,12 @@ import {
   recordReview,
   regenerateCardWithComment,
   updateProfile,
+  LEARNED_INTERVAL_DAYS,
 } from "./services.js";
 import type { GeneratedCardFields } from "./llm.js";
 import { translateText } from "./llm.js";
 import { gradeSchedule } from "./srsSchedule.js";
+import { getLeague } from "./league.js";
 import { LANGUAGE_NAMES, languageName } from "./languages.js";
 import { absoluteImageUrl, saveImage } from "./storage.js";
 
@@ -55,6 +58,11 @@ translateRouter.post("/", async (req, res) => {
 
 meRouter.get("/", async (req, res) => {
   res.json({ profile: await getProfile(req.dbUserId!) });
+});
+
+// Weekly leaderboard across the user's referral circle.
+meRouter.get("/league", async (req, res) => {
+  res.json({ entries: await getLeague(req.dbUserId!) });
 });
 
 const profileSchema = z
@@ -187,9 +195,27 @@ cardsRouter.post("/:id/grade", async (req, res) => {
     data: { ...result, lastReviewedAt: new Date() },
   });
 
-  await recordReview(req.dbUserId!);
+  // A card counts as newly learned when this review is what pushed its interval
+  // over the "mature" threshold - that drives the "learn N words" quest.
+  const learnedNow =
+    card.interval < LEARNED_INTERVAL_DAYS && updated.interval >= LEARNED_INTERVAL_DAYS;
+  await recordReview(req.dbUserId!, { learnedNow });
 
   res.json({ card: toApiCard(updated) });
+});
+
+// Finish a review session (one round): records the round + its best combo and
+// returns the refreshed profile (streak, quests, freezes).
+const sessionSchema = z.object({ bestCombo: z.number().int().min(0).max(1000) });
+
+meRouter.post("/session", async (req, res) => {
+  const parsed = sessionSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten() });
+    return;
+  }
+  const profile = await completeSession(req.dbUserId!, parsed.data.bestCombo);
+  res.json({ profile });
 });
 
 // Restores the scheduling state a card had before its last review, so the

@@ -45,6 +45,10 @@ model User {
   // via a ref link. Plain column (no relation) - we only count referrals.
   referredById String?
 
+  // Streak freezes: earned by completing a day's quests, spent automatically to
+  // cover a missed day so the streak survives.
+  streakFreezes Int @default(0)
+
   cards      Card[]
   reviewDays ReviewDay[]
 }
@@ -59,6 +63,16 @@ model ReviewDay {
   // Calendar day at UTC midnight.
   day   DateTime @db.Date
   count Int      @default(0)
+
+  // Per-day play stats, the source the daily quests are derived from.
+  sessions   Int @default(0) // completed review sessions
+  bestCombo  Int @default(0) // longest correct streak within one session
+  newLearned Int @default(0) // cards that crossed the "learned" interval today
+
+  // A day covered by a spent streak freeze: no reviews, but the streak holds.
+  frozen Boolean @default(false)
+  // Whether the day's "all quests done" reward was already granted.
+  questsRewarded Boolean @default(false)
 
   @@unique([userId, day])
 }

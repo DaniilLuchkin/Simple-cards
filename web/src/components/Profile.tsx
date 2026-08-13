@@ -5,6 +5,7 @@ import type { Palette } from "../lib/prefs";
 import { LanguageSelect } from "./LanguageSelect";
 import { ActivityHeatmap } from "./ActivityHeatmap";
 import { LearnedProgress } from "./LearnedProgress";
+import { League } from "./League";
 import { shareToTelegram } from "../lib/telegram";
 
 const PALETTE_LABEL: Record<Palette, "bgLavender" | "bgMint" | "bgSky"> = {
@@ -49,7 +50,10 @@ export function Profile({
         <div className="flex items-center justify-between">
           <div>
             <p className="text-3xl font-bold text-ink">🔥 {profile.streak}</p>
-            <p className="text-sm text-muted">{t("dayStreak")}</p>
+            <p className="text-sm text-muted">
+              {t("dayStreak")}
+              {profile.streakFreezes > 0 && ` · 🧊 ${profile.streakFreezes}`}
+            </p>
           </div>
           <div className="text-right">
             <p className="text-2xl font-semibold text-ink">
@@ -70,6 +74,9 @@ export function Profile({
         <p className="mb-3 text-sm font-semibold text-muted">{t("activityTitle")}</p>
         <ActivityHeatmap activity={profile.activity} goal={profile.dailyGoal} />
       </Card>
+
+      {/* Weekly league across the referral circle */}
+      <League />
 
       {/* Invite friends (referral) — a CTA, so it keeps its own accent card. */}
       {profile.referralLink && (

@@ -69,6 +69,22 @@ export type CardPreview = {
   fields: GeneratedFields;
 };
 
+// A daily quest, derived server-side from the day's play stats.
+export type QuestId = "session" | "goal" | "combo" | "learn" | "twoSessions" | "half";
+export type Quest = {
+  id: QuestId;
+  progress: number;
+  target: number;
+  done: boolean;
+};
+
+// One row of the weekly friends leaderboard.
+export type LeagueEntry = {
+  name: string;
+  count: number;
+  isMe: boolean;
+};
+
 export type Profile = {
   learningLanguage: string;
   translationLanguage: string;
@@ -92,6 +108,9 @@ export type Profile = {
   referralCount: number;
   todayCount: number;
   streak: number;
+  // Today's quests and the freezes banked from completing them.
+  quests: Quest[];
+  streakFreezes: number;
   // { "2026-07-03": 12, ... }
   activity: Record<string, number>;
 };
@@ -237,6 +256,13 @@ export const api = {
       body: JSON.stringify({ cards }),
     }),
   getProfile: () => request<{ profile: Profile }>("/api/me"),
+  getLeague: () => request<{ entries: LeagueEntry[] }>("/api/me/league"),
+  // Finish a review round; returns the refreshed profile (streak, quests…).
+  completeSession: (bestCombo: number) =>
+    request<{ profile: Profile }>("/api/me/session", {
+      method: "POST",
+      body: JSON.stringify({ bestCombo }),
+    }),
   updateProfile: (update: ProfileUpdate) =>
     request<{ profile: Profile }>("/api/me", {
       method: "PATCH",

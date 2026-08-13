@@ -10,6 +10,9 @@ import type { Tab } from "./components/TabBar";
 import { CameraButton } from "./components/CameraButton";
 import { Translator } from "./components/Translator";
 import { AiGenerate } from "./components/AiGenerate";
+import { SessionStart } from "./components/SessionStart";
+import { SessionSummary } from "./components/SessionSummary";
+import { haptic } from "./lib/telegram";
 
 function shuffle<T>(items: T[]): T[] {
   const result = [...items];
@@ -33,6 +36,19 @@ function sm2Snapshot(card: Card): Sm2Snapshot {
 
 type UndoInfo = { card: Card; snapshot: Sm2Snapshot; practice: boolean };
 
+// A round in progress: how long it is and how it's going so far.
+type SessionState = { size: number; done: number; correct: number; combo: number; best: number };
+type SessionResult = { reviewed: number; correct: number; bestCombo: number };
+
+// A round runs until the daily goal is met; when it's already met (or the deck
+// is short) fall back to a small fixed round so there's always something to play.
+function plannedSessionSize(profile: ProfileData | null, due: number): number {
+  const goal = profile?.dailyGoal ?? 10;
+  const remaining = goal - (profile?.todayCount ?? 0);
+  const target = remaining > 0 ? remaining : Math.min(10, goal);
+  return Math.max(1, Math.min(target, due));
+}
+
 export function App() {
   const { t, uiLang, setUiLang } = usePrefs();
   const [tab, setTab] = useState<Tab>("review");
@@ -42,6 +58,9 @@ export function App() {
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [undoInfo, setUndoInfo] = useState<UndoInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Review is played in rounds: lobby -> playing -> summary.
+  const [session, setSession] = useState<SessionState | null>(null);
+  const [summary, setSummary] = useState<SessionResult | null>(null);
 
   useEffect(() => {
     api.getDueCards().then((res) => setDueCards(res.cards)).catch((err) => setError(String(err)));
@@ -89,11 +108,47 @@ export function App() {
 
     const snapshot = sm2Snapshot(card);
     setDueCards((prev) => prev?.filter((c) => c.id !== card.id) ?? prev);
+
+    // "Again" breaks the combo; anything else extends it.
+    const correct = grade !== "again";
+    const next = session
+      ? {
+          ...session,
+          done: session.done + 1,
+          correct: session.correct + (correct ? 1 : 0),
+          combo: correct ? session.combo + 1 : 0,
+          best: correct ? Math.max(session.best, session.combo + 1) : session.best,
+        }
+      : null;
+    if (next) setSession(next);
+    if (correct && (next?.combo ?? 0) >= 2) haptic("medium");
+
     try {
       await api.gradeCard(card.id, grade);
       setUndoInfo({ card, snapshot, practice: false });
     } catch (err) {
       console.error("Failed to record review", err);
+    }
+
+    if (next && next.done >= next.size) await finishSession(next);
+  }
+
+  function startSession() {
+    const size = plannedSessionSize(profile, dueCards?.length ?? 0);
+    setSummary(null);
+    setSession({ size, done: 0, correct: 0, combo: 0, best: 0 });
+  }
+
+  // Ends the round: record it server-side (which settles quests and the streak)
+  // and switch to the summary screen.
+  async function finishSession(state: SessionState) {
+    setSession(null);
+    setSummary({ reviewed: state.done, correct: state.correct, bestCombo: state.best });
+    try {
+      const { profile: updated } = await api.completeSession(state.best);
+      setProfile(updated);
+    } catch (err) {
+      console.error("Failed to record session", err);
     }
   }
 
@@ -203,12 +258,25 @@ export function App() {
         {!error && tab === "review" && (
           reviewCards === null ? (
             <p className="p-8 text-center text-sm text-oncanvas opacity-70">{t("loading")}</p>
-          ) : (
+          ) : summary ? (
+            <SessionSummary
+              reviewed={summary.reviewed}
+              correct={summary.correct}
+              bestCombo={summary.bestCombo}
+              profile={profile}
+              canPlayAgain={(dueCards?.length ?? 0) > 0}
+              onPlayAgain={startSession}
+              onDone={() => setSummary(null)}
+            />
+          ) : session || practice ? (
             <ReviewDeck
               cards={reviewCards}
               practice={practice}
               learningLang={profile?.learningLanguage ?? "en"}
               canUndo={undoInfo !== null}
+              combo={session?.combo ?? 0}
+              sessionDone={session?.done ?? 0}
+              sessionSize={session?.size ?? 0}
               onUndo={handleUndo}
               onStartPractice={startPractice}
               onGraded={handleGraded}
@@ -217,6 +285,14 @@ export function App() {
               onGenerateImage={handleGenerateImage}
               onCardUpdated={handleCardUpdated}
               onCardDeleted={handleCardDeleted}
+            />
+          ) : (
+            <SessionStart
+              profile={profile}
+              dueCount={dueCards?.length ?? 0}
+              sessionSize={plannedSessionSize(profile, dueCards?.length ?? 0)}
+              onPlay={startSession}
+              onPractice={startPractice}
             />
           )
         )}

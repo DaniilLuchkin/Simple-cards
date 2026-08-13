@@ -13,6 +13,8 @@ import { languageNames } from "./languages.js";
 import type { Languages } from "./languages.js";
 import { absoluteImageUrl, saveImage } from "./storage.js";
 import { referralLink } from "./botInfo.js";
+import { allQuestsDone, dailyQuests } from "./quests.js";
+import type { Quest } from "./quests.js";
 
 // Maps generated fields onto the Card columns. `word`/`example` mirror
 // `headword`/filled-sentence for the library preview and legacy compatibility.
@@ -90,7 +92,7 @@ async function userLevels(userId: string): Promise<Levels> {
 
 // A card counts as "learned" once its SRS interval reaches this many days - the
 // standard "mature card" threshold.
-const LEARNED_INTERVAL_DAYS = 21;
+export const LEARNED_INTERVAL_DAYS = 21;
 
 // Every new card gets an illustration, whichever flow created it (bot chat,
 // translator, word of the day, AI set). Best-effort: a failed image must never
@@ -304,18 +306,104 @@ function localDay(tz: string | null, date = new Date()): Date {
   }
 }
 
-// Records one review toward today's streak count.
-export async function recordReview(userId: string) {
+// Records one review toward today's streak count. `learnedNow` marks a card
+// that crossed the "learned" interval with this very review, which feeds the
+// "learn N new words" quest.
+export async function recordReview(userId: string, opts: { learnedNow?: boolean } = {}) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { timezone: true },
   });
   const day = localDay(user?.timezone ?? null);
+  const learned = opts.learnedNow ? 1 : 0;
   await prisma.reviewDay.upsert({
     where: { userId_day: { userId, day } },
-    update: { count: { increment: 1 } },
-    create: { userId, day, count: 1 },
+    update: { count: { increment: 1 }, newLearned: { increment: learned } },
+    create: { userId, day, count: 1, newLearned: learned },
   });
+  await settleQuests(userId);
+}
+
+// Records a finished review session (one "round") and its best combo, then
+// returns the refreshed profile so the client can show the new streak/quests.
+export async function completeSession(userId: string, bestCombo: number) {
+  const user = await prisma.user.findUniqueOrThrow({
+    where: { id: userId },
+    select: { timezone: true },
+  });
+  const day = localDay(user.timezone);
+  const existing = await prisma.reviewDay.findUnique({
+    where: { userId_day: { userId, day } },
+  });
+
+  await prisma.reviewDay.upsert({
+    where: { userId_day: { userId, day } },
+    update: {
+      sessions: { increment: 1 },
+      bestCombo: Math.max(existing?.bestCombo ?? 0, bestCombo),
+    },
+    create: { userId, day, sessions: 1, bestCombo },
+  });
+
+  await settleQuests(userId);
+  return getProfile(userId);
+}
+
+// Grants the day's reward (+1 streak freeze) once all of today's quests are
+// done. The ReviewDay row carries the "already paid" flag, so this is safe to
+// call after every review and every session.
+async function settleQuests(userId: string) {
+  const user = await prisma.user.findUniqueOrThrow({
+    where: { id: userId },
+    select: { timezone: true, dailyGoal: true },
+  });
+  const day = localDay(user.timezone);
+  const row = await prisma.reviewDay.findUnique({ where: { userId_day: { userId, day } } });
+  if (!row || row.questsRewarded) return;
+
+  if (!allQuestsDone(dailyQuests(dayKey(day), user.dailyGoal, row))) return;
+
+  await prisma.$transaction([
+    prisma.reviewDay.update({ where: { id: row.id }, data: { questsRewarded: true } }),
+    prisma.user.update({ where: { id: userId }, data: { streakFreezes: { increment: 1 } } }),
+  ]);
+}
+
+// Spends a streak freeze to cover yesterday when its goal was missed, so a
+// single skipped day doesn't reset the streak. Idempotent: the covered day is
+// marked `frozen`, and only the one day back is ever considered - a freeze
+// can't resurrect a streak that already ended.
+async function applyStreakFreeze(userId: string, tz: string | null, dailyGoal: number) {
+  const yesterday = localDay(tz);
+  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+
+  const day = await prisma.reviewDay.findUnique({
+    where: { userId_day: { userId, day: yesterday } },
+  });
+  if (day && (day.count >= dailyGoal || day.frozen)) return; // nothing to cover
+
+  const user = await prisma.user.findUniqueOrThrow({
+    where: { id: userId },
+    select: { streakFreezes: true },
+  });
+  if (user.streakFreezes <= 0) return;
+
+  // Only spend when there is an actual streak to protect.
+  const before = new Date(yesterday);
+  before.setUTCDate(before.getUTCDate() - 1);
+  const prev = await prisma.reviewDay.findUnique({
+    where: { userId_day: { userId, day: before } },
+  });
+  if (!prev || (prev.count < dailyGoal && !prev.frozen)) return;
+
+  await prisma.$transaction([
+    prisma.reviewDay.upsert({
+      where: { userId_day: { userId, day: yesterday } },
+      update: { frozen: true },
+      create: { userId, day: yesterday, frozen: true },
+    }),
+    prisma.user.update({ where: { id: userId }, data: { streakFreezes: { decrement: 1 } } }),
+  ]);
 }
 
 export type Profile = {
@@ -340,6 +428,9 @@ export type Profile = {
   referralCount: number;
   todayCount: number;
   streak: number;
+  // Today's quests (derived) and the freezes banked from completing them.
+  quests: Quest[];
+  streakFreezes: number;
   // { "2026-07-03": 12, ... } for roughly the last ~130 days.
   activity: Record<string, number>;
 };
@@ -361,8 +452,15 @@ export async function getProfile(userId: string): Promise<Profile> {
       reminderEnabled: true,
       currentLevel: true,
       targetLevel: true,
+      streakFreezes: true,
     },
   });
+
+  // May spend a banked freeze to cover yesterday before the streak is walked.
+  await applyStreakFreeze(userId, user.timezone, user.dailyGoal);
+  const streakFreezes = (
+    await prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { streakFreezes: true } })
+  ).streakFreezes;
 
   const [learnedCount, referralCount] = await Promise.all([
     prisma.card.count({ where: { userId, interval: { gte: LEARNED_INTERVAL_DAYS } } }),
@@ -377,20 +475,36 @@ export async function getProfile(userId: string): Promise<Profile> {
   });
 
   const activity: Record<string, number> = {};
-  for (const d of days) activity[dayKey(d.day)] = d.count;
+  const frozenDays = new Set<string>();
+  for (const d of days) {
+    activity[dayKey(d.day)] = d.count;
+    if (d.frozen) frozenDays.add(dayKey(d.day));
+  }
 
-  const todayKey = dayKey(localDay(user.timezone));
+  const today = localDay(user.timezone);
+  const todayKey = dayKey(today);
   const todayCount = activity[todayKey] ?? 0;
+
+  // A day holds the streak when its goal was met or a freeze covered it.
+  const held = (key: string) => (activity[key] ?? 0) >= user.dailyGoal || frozenDays.has(key);
 
   // Streak = consecutive days up to today meeting the goal. Today not yet met
   // doesn't break the streak (the day isn't over), it just doesn't extend it.
   let streak = 0;
   const cursor = localDay(user.timezone);
   if (todayCount < user.dailyGoal) cursor.setUTCDate(cursor.getUTCDate() - 1);
-  while ((activity[dayKey(cursor)] ?? 0) >= user.dailyGoal) {
+  while (held(dayKey(cursor))) {
     streak += 1;
     cursor.setUTCDate(cursor.getUTCDate() - 1);
   }
+
+  const todayRow = days.find((d) => dayKey(d.day) === todayKey);
+  const quests = dailyQuests(todayKey, user.dailyGoal, {
+    count: todayRow?.count ?? 0,
+    sessions: todayRow?.sessions ?? 0,
+    bestCombo: todayRow?.bestCombo ?? 0,
+    newLearned: todayRow?.newLearned ?? 0,
+  });
 
   return {
     learningLanguage: user.learningLanguage,
@@ -407,6 +521,8 @@ export async function getProfile(userId: string): Promise<Profile> {
     referralCount,
     todayCount,
     streak,
+    quests,
+    streakFreezes,
     activity,
   };
 }

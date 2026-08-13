@@ -1,0 +1,9 @@
+-- AlterTable
+ALTER TABLE "User" ADD COLUMN     "streakFreezes" INTEGER NOT NULL DEFAULT 0;
+
+-- AlterTable
+ALTER TABLE "ReviewDay" ADD COLUMN     "sessions" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "bestCombo" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "newLearned" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "frozen" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN     "questsRewarded" BOOLEAN NOT NULL DEFAULT false;
