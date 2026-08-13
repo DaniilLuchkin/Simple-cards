@@ -1,6 +1,7 @@
 import { LANGUAGES } from "../lib/i18n";
 
 // Native select — reliable inside the Telegram webview and accessible.
+// Renders as a plain row; the caller supplies the surrounding card.
 export function LanguageSelect({
   value,
   onChange,
@@ -11,7 +12,7 @@ export function LanguageSelect({
   label: string;
 }) {
   return (
-    <label className="flex items-center justify-between gap-3 rounded-2xl border-2 border-black bg-surface px-4 py-3 shadow-toon">
+    <label className="flex items-center justify-between gap-3">
       <span className="text-sm text-ink">{label}</span>
       <select
         value={value}

@@ -1,59 +1,48 @@
 import { usePrefs } from "../lib/prefs";
 
-// Real-world vocabulary milestones (approximate word counts). Shown optionally,
-// since not everyone starts from zero.
-const MILESTONES = [
-  { key: "msCafe", words: 300 },
-  { key: "msTalk", words: 1000 },
-  { key: "msFluent", words: 3000 },
-  { key: "msBooks", words: 5000 },
-  { key: "msWork", words: 8000 },
-] as const;
+// Plain word-count milestones - no labels, so they fit any learner regardless
+// of where they started.
+const MILESTONES = [100, 300, 1000, 3000, 5000, 8000];
 
-// Words learned so far + progress toward the next real-world milestone.
-export function LearnedProgress({
-  learned,
-  showMilestones,
-}: {
-  learned: number;
-  showMilestones: boolean;
-}) {
+// Words learned so far + progress toward the next milestone.
+export function LearnedProgress({ learned }: { learned: number }) {
   const { t } = usePrefs();
-  const next = MILESTONES.find((m) => m.words > learned);
+  const next = MILESTONES.find((m) => m > learned) ?? null;
+  const pct = next ? Math.min(100, Math.round((learned / next) * 100)) : 100;
 
   return (
-    <div className="rounded-2xl border-2 border-black bg-surface p-5 shadow-toon">
+    <div>
       <div className="flex items-baseline justify-between">
         <p className="text-3xl font-bold text-ink">📚 {learned}</p>
         <p className="text-sm text-muted">{t("wordsLearned")}</p>
       </div>
 
-      {showMilestones && (
-        <div className="mt-4 flex flex-col gap-2.5">
-          {MILESTONES.map((m) => {
-            const reached = learned >= m.words;
-            const isNext = m === next;
-            const pct = Math.min(100, Math.round((learned / m.words) * 100));
-            return (
-              <div key={m.key} className="flex flex-col gap-1">
-                <div className="flex items-center justify-between text-sm">
-                  <span className={reached ? "font-semibold text-ink" : "text-muted"}>
-                    {reached ? "✅" : isNext ? "🎯" : "🔒"} {t(m.key)}
-                  </span>
-                  <span className={`text-xs ${reached ? "text-emerald-600" : "text-muted"}`}>
-                    {reached ? t("reached") : `${learned}/${m.words}`}
-                  </span>
-                </div>
-                {isNext && (
-                  <div className="h-2 overflow-hidden rounded-full border-2 border-black bg-white">
-                    <div className="h-full bg-mint" style={{ width: `${pct}%` }} />
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
+      <div className="mt-3 h-2.5 overflow-hidden rounded-full border-2 border-black bg-white">
+        <div className="h-full bg-mint transition-all" style={{ width: `${pct}%` }} />
+      </div>
+
+      {/* All milestones fit one row on a narrow phone, so the ladder reads at
+          a glance instead of wrapping. */}
+      <div className="mt-2.5 flex flex-wrap gap-1">
+        {MILESTONES.map((m) => {
+          const reached = learned >= m;
+          const isNext = m === next;
+          return (
+            <span
+              key={m}
+              className={`rounded-full border-2 px-2 py-0.5 text-[11px] font-semibold ${
+                reached
+                  ? "border-black bg-mint text-ink"
+                  : isNext
+                    ? "border-black bg-white text-ink"
+                    : "border-black/25 bg-white text-muted"
+              }`}
+            >
+              {m}
+            </span>
+          );
+        })}
+      </div>
     </div>
   );
 }

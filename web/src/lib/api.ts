@@ -85,8 +85,6 @@ export type Profile = {
   // CEFR self-assessed level and goal.
   currentLevel: string;
   targetLevel: string;
-  // Whether to show the real-world word-count milestones.
-  showMilestones: boolean;
   // Cards mature enough to count as "learned".
   learnedCount: number;
   // Referral deep link (null when unknown) + how many friends this user invited.
@@ -110,7 +108,6 @@ export type ProfileUpdate = Partial<
     | "reminderEnabled"
     | "currentLevel"
     | "targetLevel"
-    | "showMilestones"
   >
 >;
 

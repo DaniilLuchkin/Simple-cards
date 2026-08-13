@@ -43,9 +43,9 @@ export function Profile({
   }
 
   return (
-    <div className="-mx-2 flex h-full flex-col gap-5 overflow-y-auto px-2 pb-8 pt-1">
-      {/* Streak + today's progress */}
-      <div className="rounded-2xl border-2 border-black bg-surface p-5 shadow-toon">
+    <div className="-mx-2 flex h-full flex-col gap-4 overflow-y-auto px-2 pb-8 pt-1">
+      {/* Progress: streak, words learned, activity — one story, one card. */}
+      <Card>
         <div className="flex items-center justify-between">
           <div>
             <p className="text-3xl font-bold text-ink">🔥 {profile.streak}</p>
@@ -59,13 +59,19 @@ export function Profile({
             <p className="text-sm text-muted">{t("today")}</p>
           </div>
         </div>
-        {goalMet && <p className="mt-3 text-center text-sm font-semibold text-emerald-600">{t("goalMet")}</p>}
-      </div>
+        {goalMet && (
+          <p className="mt-3 text-center text-sm font-semibold text-emerald-600">{t("goalMet")}</p>
+        )}
 
-      {/* Words learned + real-world milestones */}
-      <LearnedProgress learned={profile.learnedCount} showMilestones={profile.showMilestones} />
+        <Divider />
+        <LearnedProgress learned={profile.learnedCount} />
 
-      {/* Invite friends (referral) */}
+        <Divider />
+        <p className="mb-3 text-sm font-semibold text-muted">{t("activityTitle")}</p>
+        <ActivityHeatmap activity={profile.activity} goal={profile.dailyGoal} />
+      </Card>
+
+      {/* Invite friends (referral) — a CTA, so it keeps its own accent card. */}
       {profile.referralLink && (
         <div className="rounded-2xl border-2 border-black bg-sky p-5 shadow-toon">
           <p className="text-sm font-semibold text-ink">{t("inviteTitle")}</p>
@@ -85,9 +91,9 @@ export function Profile({
         </div>
       )}
 
-      {/* My level & goal */}
-      <div className="rounded-2xl border-2 border-black bg-surface p-4 shadow-toon">
-        <p className="mb-3 text-sm text-ink">{t("myLevel")}</p>
+      {/* Goals: CEFR level/target + daily card goal. */}
+      <Card>
+        <SectionTitle>{t("goalsSection")}</SectionTitle>
         <div className="flex gap-2">
           <label className="flex flex-1 flex-col gap-1">
             <span className="text-xs font-semibold text-muted">{t("levelNow")}</span>
@@ -119,58 +125,50 @@ export function Profile({
           </label>
         </div>
         <p className="mt-2 text-xs text-muted">{t("levelHint")}</p>
-      </div>
 
-      {/* Show word-count milestones on/off */}
-      <ToggleRow
-        label={t("showMilestonesLabel")}
-        checked={profile.showMilestones}
-        onToggle={() => onUpdate({ showMilestones: !profile.showMilestones })}
-      />
-
-      {/* Activity heatmap */}
-      <div className="rounded-2xl border-2 border-black bg-surface p-5 shadow-toon">
-        <p className="mb-3 text-sm font-semibold text-muted">{t("activityTitle")}</p>
-        <ActivityHeatmap activity={profile.activity} goal={profile.dailyGoal} />
-      </div>
-
-      {/* Daily goal stepper */}
-      <div className="flex items-center justify-between rounded-2xl border-2 border-black bg-surface px-4 py-3 shadow-toon">
-        <span className="text-sm text-ink">{t("dailyGoal")}</span>
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => commitGoal(goal - 1)}
-            className="h-8 w-8 rounded-full border-2 border-black bg-white text-lg font-semibold text-ink shadow-toon-sm"
-          >
-            −
-          </button>
-          <span className="w-8 text-center text-lg font-semibold text-ink">{goal}</span>
-          <button
-            type="button"
-            onClick={() => commitGoal(goal + 1)}
-            className="h-8 w-8 rounded-full border-2 border-black bg-white text-lg font-semibold text-ink shadow-toon-sm"
-          >
-            +
-          </button>
+        <Divider />
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-ink">{t("dailyGoal")}</span>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => commitGoal(goal - 1)}
+              className="h-8 w-8 rounded-full border-2 border-black bg-white text-lg font-semibold text-ink shadow-toon-sm"
+            >
+              −
+            </button>
+            <span className="w-8 text-center text-lg font-semibold text-ink">{goal}</span>
+            <button
+              type="button"
+              onClick={() => commitGoal(goal + 1)}
+              className="h-8 w-8 rounded-full border-2 border-black bg-white text-lg font-semibold text-ink shadow-toon-sm"
+            >
+              +
+            </button>
+          </div>
         </div>
-      </div>
+      </Card>
 
-      {/* Daily reminder + word of the day */}
-      <ToggleRow
-        label={t("reminders")}
-        checked={profile.reminderEnabled}
-        onToggle={() => onUpdate({ reminderEnabled: !profile.reminderEnabled })}
-      />
-      <ToggleRow
-        label={t("wordOfDay")}
-        checked={profile.wordOfDayEnabled}
-        onToggle={() => onUpdate({ wordOfDayEnabled: !profile.wordOfDayEnabled })}
-      />
+      {/* Notifications */}
+      <Card>
+        <SectionTitle>{t("notifications")}</SectionTitle>
+        <div className="flex flex-col gap-3">
+          <SwitchRow
+            label={t("reminders")}
+            checked={profile.reminderEnabled}
+            onToggle={() => onUpdate({ reminderEnabled: !profile.reminderEnabled })}
+          />
+          <SwitchRow
+            label={t("wordOfDay")}
+            checked={profile.wordOfDayEnabled}
+            onToggle={() => onUpdate({ wordOfDayEnabled: !profile.wordOfDayEnabled })}
+          />
+        </div>
+      </Card>
 
-      {/* Light / dark theme */}
-      <div className="rounded-2xl border-2 border-black bg-surface p-4 shadow-toon">
-        <p className="mb-3 text-sm text-ink">{t("theme")}</p>
+      {/* Appearance: theme + light-theme canvas color. */}
+      <Card>
+        <SectionTitle>{t("appearance")}</SectionTitle>
         <div className="flex gap-2">
           <button
             type="button"
@@ -197,10 +195,8 @@ export function Profile({
             🌙 {t("themeDark")}
           </button>
         </div>
-      </div>
 
-      {/* Light-theme background color */}
-      <div className="rounded-2xl border-2 border-black bg-surface p-4 shadow-toon">
+        <Divider />
         <p className="mb-3 text-sm text-ink">{t("bgColor")}</p>
         <div className="flex gap-3">
           {PALETTES.map((p) => {
@@ -222,35 +218,54 @@ export function Profile({
             );
           })}
         </div>
-      </div>
+      </Card>
 
       {/* Languages */}
-      <div className="flex flex-col gap-2">
-        <LanguageSelect
-          label={t("interfaceLanguage")}
-          value={uiLang}
-          onChange={(code) => {
-            setUiLang(code);
-            onUpdate({ interfaceLanguage: code });
-          }}
-        />
-        <LanguageSelect
-          label={t("iLearn")}
-          value={profile.learningLanguage}
-          onChange={(code) => onUpdate({ learningLanguage: code })}
-        />
-        <LanguageSelect
-          label={t("translateTo")}
-          value={profile.translationLanguage}
-          onChange={(code) => onUpdate({ translationLanguage: code })}
-        />
-      </div>
+      <Card>
+        <SectionTitle>{t("languages")}</SectionTitle>
+        <div className="flex flex-col gap-3">
+          <LanguageSelect
+            label={t("interfaceLanguage")}
+            value={uiLang}
+            onChange={(code) => {
+              setUiLang(code);
+              onUpdate({ interfaceLanguage: code });
+            }}
+          />
+          <LanguageSelect
+            label={t("iLearn")}
+            value={profile.learningLanguage}
+            onChange={(code) => onUpdate({ learningLanguage: code })}
+          />
+          <LanguageSelect
+            label={t("translateTo")}
+            value={profile.translationLanguage}
+            onChange={(code) => onUpdate({ translationLanguage: code })}
+          />
+        </div>
+      </Card>
     </div>
   );
 }
 
-// A labeled on/off switch styled like the rest of the toon settings.
-function ToggleRow({
+// The standard toon settings card every section sits in.
+function Card({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="rounded-2xl border-2 border-black bg-surface p-5 shadow-toon">{children}</div>
+  );
+}
+
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return <p className="mb-3 text-sm font-semibold text-muted">{children}</p>;
+}
+
+// Separates related settings inside one card, so grouped rows stay readable
+// without splitting them into separate cards.
+function Divider() {
+  return <div className="my-4 border-t-2 border-dashed border-black/15" />;
+}
+
+function SwitchRow({
   label,
   checked,
   onToggle,
@@ -260,7 +275,7 @@ function ToggleRow({
   onToggle: () => void;
 }) {
   return (
-    <div className="flex items-center justify-between rounded-2xl border-2 border-black bg-surface px-4 py-3 shadow-toon">
+    <div className="flex items-center justify-between">
       <span className="text-sm text-ink">{label}</span>
       <button
         type="button"
@@ -268,7 +283,7 @@ function ToggleRow({
         aria-checked={checked}
         aria-label={label}
         onClick={onToggle}
-        className={`relative h-8 w-14 rounded-full border-2 border-black shadow-toon-sm transition-colors ${
+        className={`relative h-8 w-14 shrink-0 rounded-full border-2 border-black shadow-toon-sm transition-colors ${
           checked ? "bg-mint" : "bg-white"
         }`}
       >

@@ -318,8 +318,6 @@ export type Profile = {
   // CEFR self-assessed level and goal.
   currentLevel: string;
   targetLevel: string;
-  // Whether to show the real-world word-count milestones.
-  showMilestones: boolean;
   // Cards whose SRS interval is mature enough to count as "learned".
   learnedCount: number;
   // Referral deep link (null when the bot username isn't known) + invites made.
@@ -348,7 +346,6 @@ export async function getProfile(userId: string): Promise<Profile> {
       reminderEnabled: true,
       currentLevel: true,
       targetLevel: true,
-      showMilestones: true,
     },
   });
 
@@ -390,7 +387,6 @@ export async function getProfile(userId: string): Promise<Profile> {
     reminderEnabled: user.reminderEnabled,
     currentLevel: user.currentLevel,
     targetLevel: user.targetLevel,
-    showMilestones: user.showMilestones,
     learnedCount,
     referralLink: referralLink(userId),
     referralCount,
@@ -412,7 +408,6 @@ export async function updateProfile(
     reminderEnabled?: boolean;
     currentLevel?: string;
     targetLevel?: string;
-    showMilestones?: boolean;
   }
 ) {
   await prisma.user.update({ where: { id: userId }, data });

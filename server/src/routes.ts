@@ -82,7 +82,6 @@ const profileSchema = z
     reminderEnabled: z.boolean(),
     currentLevel: z.enum(["A0", "A1", "A2", "B1", "B2", "C1", "C2"]),
     targetLevel: z.enum(["A1", "A2", "B1", "B2", "C1", "C2"]),
-    showMilestones: z.boolean(),
   })
   .partial()
   .refine((d) => Object.keys(d).length > 0, { message: "No fields to update" });
