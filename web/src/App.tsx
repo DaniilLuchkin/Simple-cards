@@ -12,6 +12,8 @@ import { Translator } from "./components/Translator";
 import { AiGenerate } from "./components/AiGenerate";
 import { SessionStart } from "./components/SessionStart";
 import { SessionSummary } from "./components/SessionSummary";
+import { isFasterThan } from "./lib/format";
+import type { TimedBest } from "./lib/format";
 import { haptic } from "./lib/telegram";
 
 function shuffle<T>(items: T[]): T[] {
@@ -39,24 +41,25 @@ type UndoInfo = { card: Card; snapshot: Sm2Snapshot; practice: boolean };
 // Timed rounds: 60s by default, adjustable 30s..5min from the lobby.
 const TIMED_DEFAULT_SECONDS = 60;
 const TIMED_SECONDS_KEY = "timedSeconds";
-const TIMED_BESTS_KEY = "timedBests";
+const TIMED_BESTS_KEY = "timedBestRun";
 
 function readTimedSeconds(): number {
   const raw = Number(localStorage.getItem(TIMED_SECONDS_KEY));
   return Number.isFinite(raw) && raw >= 30 && raw <= 300 ? raw : TIMED_DEFAULT_SECONDS;
 }
 
-// Bests are kept PER duration - a 5-minute run would otherwise permanently
-// beat every 30-second one and the record would stop meaning anything.
-type TimedBests = Record<string, number>;
-
-function readTimedBests(): TimedBests {
+// One record for all lengths: runs are compared by PACE (cards per minute), so
+// a 5-minute run no longer automatically beats a 30-second one.
+function readTimedBest(): TimedBest | null {
   try {
-    const parsed = JSON.parse(localStorage.getItem(TIMED_BESTS_KEY) ?? "{}");
-    return parsed && typeof parsed === "object" ? (parsed as TimedBests) : {};
+    const parsed = JSON.parse(localStorage.getItem(TIMED_BESTS_KEY) ?? "null");
+    if (parsed && typeof parsed.count === "number" && typeof parsed.seconds === "number") {
+      return parsed as TimedBest;
+    }
   } catch {
-    return {};
+    /* corrupt or legacy value - start fresh */
   }
+  return null;
 }
 
 export type SessionMode = "normal" | "timed";
@@ -79,6 +82,7 @@ type SessionResult = {
   correct: number;
   bestCombo: number;
   timed: boolean;
+  timedSeconds: number;
   record: boolean;
 };
 
@@ -104,7 +108,7 @@ export function App() {
   const [session, setSession] = useState<SessionState | null>(null);
   const [summary, setSummary] = useState<SessionResult | null>(null);
   const [timedSeconds, setTimedSeconds] = useState(readTimedSeconds);
-  const [timedBests, setTimedBests] = useState<TimedBests>(readTimedBests);
+  const [timedBest, setTimedBest] = useState<TimedBest | null>(readTimedBest);
   // Ticks only while a timed round is live, to drive the countdown.
   const [now, setNow] = useState(() => Date.now());
 
@@ -226,12 +230,11 @@ export function App() {
   // and switch to the summary screen.
   async function finishSession(state: SessionState) {
     const timed = state.mode === "timed";
-    const key = String(state.totalSeconds);
-    const record = timed && state.done > (timedBests[key] ?? 0);
+    const run: TimedBest = { count: state.done, seconds: state.totalSeconds };
+    const record = timed && isFasterThan(run, timedBest);
     if (record) {
-      const next = { ...timedBests, [key]: state.done };
-      setTimedBests(next);
-      localStorage.setItem(TIMED_BESTS_KEY, JSON.stringify(next));
+      setTimedBest(run);
+      localStorage.setItem(TIMED_BESTS_KEY, JSON.stringify(run));
     }
 
     setSession(null);
@@ -240,6 +243,7 @@ export function App() {
       correct: state.correct,
       bestCombo: state.best,
       timed,
+      timedSeconds: state.totalSeconds,
       record,
     });
     try {
@@ -362,6 +366,7 @@ export function App() {
               correct={summary.correct}
               bestCombo={summary.bestCombo}
               timed={summary.timed}
+              timedSeconds={summary.timedSeconds}
               record={summary.record}
               profile={profile}
               canPlayAgain={(dueCards?.length ?? 0) > 0}
@@ -395,7 +400,7 @@ export function App() {
               dueCount={dueCards?.length ?? 0}
               sessionSize={plannedSessionSize(profile, dueCards?.length ?? 0)}
               timedSeconds={timedSeconds}
-              timedBests={timedBests}
+              timedBest={timedBest}
               onPlay={() => startSession("normal")}
               onPlayTimed={(seconds) => startSession("timed", seconds)}
               onPractice={startPractice}

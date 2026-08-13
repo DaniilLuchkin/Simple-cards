@@ -1,20 +1,14 @@
 import { useState } from "react";
 import type { Profile } from "../lib/api";
 import { usePrefs } from "../lib/prefs";
+import { cardsPerMinute, formatDuration } from "../lib/format";
+import type { TimedBest } from "../lib/format";
 import { QuestList } from "./QuestList";
 
 // Timed-round length: 30s … 5min, in 15s steps.
 const MIN_SECONDS = 30;
 const MAX_SECONDS = 300;
 const STEP_SECONDS = 15;
-
-/** 45 -> "45s", 90 -> "1:30" — short values read better as plain seconds. */
-export function formatDuration(seconds: number, secondsLabel: string): string {
-  if (seconds < 60) return `${seconds}${secondsLabel}`;
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return `${m}:${String(s).padStart(2, "0")}`;
-}
 
 // The Review tab's lobby: what's waiting, today's quests, and the big Play
 // button that starts a round. Having an explicit start makes a session feel
@@ -24,7 +18,7 @@ export function SessionStart({
   dueCount,
   sessionSize,
   timedSeconds,
-  timedBests,
+  timedBest,
   onPlay,
   onPlayTimed,
   onPractice,
@@ -34,8 +28,8 @@ export function SessionStart({
   sessionSize: number;
   /** Last chosen timed length (persisted by the caller). */
   timedSeconds: number;
-  /** Personal bests keyed by duration in seconds. */
-  timedBests: Record<string, number>;
+  /** Best run so far, scored by pace so any duration is comparable. */
+  timedBest: TimedBest | null;
   onPlay: () => void;
   onPlayTimed: (seconds: number) => void;
   onPractice: () => void;
@@ -49,7 +43,9 @@ export function SessionStart({
   // straight away, so the duration is always a deliberate choice.
   const [picking, setPicking] = useState(false);
   const [seconds, setSeconds] = useState(timedSeconds);
-  const best = timedBests[String(seconds)] ?? 0;
+  // One record for every length: pace makes the runs comparable.
+  const bestPace = timedBest ? cardsPerMinute(timedBest.count, timedBest.seconds) : 0;
+  const bestLabel = `${t("record")}: ${bestPace}${t("perMinuteShort")}`;
 
   return (
     <div className="-mx-2 flex h-full flex-col gap-4 overflow-y-auto px-2 pb-6 pt-1">
@@ -118,11 +114,7 @@ export function SessionStart({
                 />
                 <div className="flex justify-between text-[11px] text-muted">
                   <span>{formatDuration(MIN_SECONDS, t("timedLeft"))}</span>
-                  {best > 0 && (
-                    <span>
-                      {t("record")}: {best}
-                    </span>
-                  )}
+                  {bestPace > 0 && <span>{bestLabel}</span>}
                   <span>{formatDuration(MAX_SECONDS, t("timedLeft"))}</span>
                 </div>
                 <button
@@ -140,10 +132,8 @@ export function SessionStart({
                 className="rounded-2xl border-2 border-black bg-butter px-4 py-3 text-base font-bold text-ink shadow-toon-sm"
               >
                 ⏱ {t("playTimed")} · {formatDuration(seconds, t("timedLeft"))}
-                {best > 0 && (
-                  <span className="ml-2 text-xs font-semibold opacity-70">
-                    {t("record")}: {best}
-                  </span>
+                {bestPace > 0 && (
+                  <span className="ml-2 text-xs font-semibold opacity-70">{bestLabel}</span>
                 )}
               </button>
             )}

@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import type { Profile } from "../lib/api";
 import { usePrefs } from "../lib/prefs";
+import { cardsPerMinute } from "../lib/format";
 import { Confetti } from "./Confetti";
 import { QuestList } from "./QuestList";
 
@@ -11,6 +12,7 @@ export function SessionSummary({
   correct,
   bestCombo,
   timed,
+  timedSeconds,
   record,
   profile,
   canPlayAgain,
@@ -22,6 +24,8 @@ export function SessionSummary({
   bestCombo: number;
   /** Timed round: the card count reads as a score, and a new best is called out. */
   timed: boolean;
+  /** Length of the timed round, used to show the pace. */
+  timedSeconds: number;
   record: boolean;
   profile: Profile | null;
   canPlayAgain: boolean;
@@ -48,7 +52,11 @@ export function SessionSummary({
         </motion.div>
 
         <div className="mt-5 grid grid-cols-3 gap-2">
-          <Stat value={String(reviewed)} label={timed ? t("timedScore") : t("statCards")} />
+          <Stat
+            value={String(reviewed)}
+            label={timed ? t("timedScore") : t("statCards")}
+            note={timed ? `${cardsPerMinute(reviewed, timedSeconds)} ${t("perMinute")}` : undefined}
+          />
           <Stat value={`${accuracy}%`} label={t("statAccuracy")} />
           <Stat value={`🔥${bestCombo}`} label={t("statCombo")} />
         </div>
@@ -91,11 +99,12 @@ export function SessionSummary({
   );
 }
 
-function Stat({ value, label }: { value: string; label: string }) {
+function Stat({ value, label, note }: { value: string; label: string; note?: string }) {
   return (
     <div className="rounded-xl border-2 border-black bg-white px-2 py-2">
       <p className="text-lg font-bold text-ink">{value}</p>
       <p className="text-[11px] text-muted">{label}</p>
+      {note && <p className="text-[11px] font-semibold text-ink">{note}</p>}
     </div>
   );
 }
