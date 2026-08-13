@@ -34,10 +34,13 @@ function fieldRules({ learning, translation }: Languages): string {
 - "forms": 1-3 key inflected forms of the headword in ${learning} (e.g. ["drizzled", "drizzling"]). Empty array if not applicable.
 - "sentence": ONE natural example sentence in ${learning} using the word, but with the target word replaced by the literal token ${GAP}. Keep the rest of the sentence natural. Reuse the user's example (lightly fixed) if they gave one.
 - "explanation": the meaning in SIMPLE ${learning} (beginner level, short sentences). ONE sense only. Do not just repeat the word.
-- "translation": a short, accurate ${translation} translation. ONE sense only, matching "explanation".
+- "translation": the 1-3 most common ${translation} equivalents OF THE SINGLE SENSE you chose, comma-separated, most common first (e.g. for "maintain" in the upkeep sense: "обслуживать, поддерживать в хорошем состоянии"). Give more than one only when they are genuinely interchangeable synonyms a learner would recognise; one is fine when the word has a single natural equivalent. Never pad the list.
 - "collocations": 2-3 frequent ${learning} collocations or set phrases with the word.
 
-Minimum-information principle: pick ONE sense of the word. Never combine multiple meanings into "explanation"/"translation" - if the word has several senses, choose the single most useful one.`;
+Minimum-information principle: pick ONE sense of the word and describe only that sense.
+- SYNONYMS of that one sense belong together in "translation" - a learner may hold the word under any of them, so listing them prevents false failures.
+- DIFFERENT senses must never share a card ("maintain" = keep in good condition vs = assert). If the word has several senses, pick the single most useful one and ignore the rest.
+- Never use ";" or "/" in "translation": those read as separate senses. Commas separate synonyms only.`;
 }
 
 // Self-assessed CEFR level + goal, used to aim vocabulary difficulty.

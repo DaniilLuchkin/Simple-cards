@@ -29,7 +29,8 @@ export const drizzleCard: SrsCard = {
   ipa: "/ˈdrɪz.əl/",
   pos: "глагол",
   forms: ["drizzled", "drizzling"],
-  meaning: "моросить — идёт мелкий, лёгкий дождь",
+  // Synonyms of the SAME sense, the shape the generator now produces.
+  meaning: "моросить, накрапывать — идёт мелкий, лёгкий дождь",
   explanation: "to rain lightly, in very small drops",
   sentence: "It's starting to {{gap}} again — classic Vancouver morning.",
   collocations: ["began to drizzle", "it drizzled all afternoon", "drizzle on and off"],

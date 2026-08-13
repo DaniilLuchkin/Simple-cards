@@ -22,8 +22,13 @@ export type SrsCard = {
 };
 
 // Minimum-information principle: one card = one fact. A card whose `meaning`
-// smuggles several senses (";", " / ", multiple comma-separated glosses) should
-// be split into separate cards instead. This validates that at creation time.
+// smuggles several SENSES should be split into separate cards instead; this
+// validates that at creation time.
+//
+// Synonyms of a single sense are fine and encouraged - a learner may hold the
+// word under any of them ("обслуживать" ≈ "поддерживать в хорошем состоянии"),
+// so listing a few prevents false failures. Only "; " / " / " and an overlong
+// comma list read as distinct senses.
 export function validateSrsCard(card: SrsCard): string[] {
   const errors: string[] = [];
 
@@ -43,16 +48,21 @@ export function validateSrsCard(card: SrsCard): string[] {
   return errors;
 }
 
+// Max comma-separated synonyms we accept as ONE sense. Up to three reads as
+// "the same meaning said a few ways"; beyond that it's a dumped sense list.
+const MAX_SYNONYMS = 3;
+
 function looksLikeMultipleSenses(meaning: string): boolean {
   // A semicolon almost always separates distinct senses.
   if (meaning.includes(";")) return true;
   // " / " between short glosses (not a dash-explanation) also signals senses.
   if (/\s\/\s/.test(meaning)) return true;
-  // Three or more comma-separated short fragments with no explanatory dash
-  // reads as a synonym list of senses rather than one explained meaning.
+  // Commas separate synonyms of one sense - allowed up to MAX_SYNONYMS. A
+  // longer list is a sense dump. A dash means it's one explained gloss, which
+  // can legitimately contain commas.
   const hasExplanation = /[—–-]/.test(meaning);
   const fragments = meaning.split(",").map((s) => s.trim()).filter(Boolean);
-  if (!hasExplanation && fragments.length >= 3) return true;
+  if (!hasExplanation && fragments.length > MAX_SYNONYMS) return true;
 
   return false;
 }
