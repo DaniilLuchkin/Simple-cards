@@ -157,28 +157,16 @@ export function Profile({
       </div>
 
       {/* Daily reminder + word of the day */}
-      {/* Notifications: word of the day + everything else */}
-      <div className="rounded-2xl border-2 border-black bg-surface p-4 shadow-toon">
-        <p className="mb-3 text-sm text-ink">{t("notifications")}</p>
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-ink">{t("wordOfDay")}</span>
-            <Switch
-              label={t("wordOfDay")}
-              checked={profile.wordOfDayEnabled}
-              onToggle={() => onUpdate({ wordOfDayEnabled: !profile.wordOfDayEnabled })}
-            />
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-ink">{t("otherNotifications")}</span>
-            <Switch
-              label={t("otherNotifications")}
-              checked={profile.reminderEnabled}
-              onToggle={() => onUpdate({ reminderEnabled: !profile.reminderEnabled })}
-            />
-          </div>
-        </div>
-      </div>
+      <ToggleRow
+        label={t("reminders")}
+        checked={profile.reminderEnabled}
+        onToggle={() => onUpdate({ reminderEnabled: !profile.reminderEnabled })}
+      />
+      <ToggleRow
+        label={t("wordOfDay")}
+        checked={profile.wordOfDayEnabled}
+        onToggle={() => onUpdate({ wordOfDayEnabled: !profile.wordOfDayEnabled })}
+      />
 
       {/* Light / dark theme */}
       <div className="rounded-2xl border-2 border-black bg-surface p-4 shadow-toon">
@@ -261,37 +249,7 @@ export function Profile({
   );
 }
 
-// A toon on/off pill switch.
-function Switch({
-  label,
-  checked,
-  onToggle,
-}: {
-  label: string;
-  checked: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      onClick={onToggle}
-      className={`relative h-8 w-14 shrink-0 rounded-full border-2 border-black shadow-toon-sm transition-colors ${
-        checked ? "bg-mint" : "bg-white"
-      }`}
-    >
-      <span
-        className={`absolute top-1/2 h-5 w-5 -translate-y-1/2 rounded-full border-2 border-black bg-white transition-all ${
-          checked ? "left-[26px]" : "left-[2px]"
-        }`}
-      />
-    </button>
-  );
-}
-
-// A standalone labeled switch inside its own toon card.
+// A labeled on/off switch styled like the rest of the toon settings.
 function ToggleRow({
   label,
   checked,
@@ -304,7 +262,22 @@ function ToggleRow({
   return (
     <div className="flex items-center justify-between rounded-2xl border-2 border-black bg-surface px-4 py-3 shadow-toon">
       <span className="text-sm text-ink">{label}</span>
-      <Switch label={label} checked={checked} onToggle={onToggle} />
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-label={label}
+        onClick={onToggle}
+        className={`relative h-8 w-14 rounded-full border-2 border-black shadow-toon-sm transition-colors ${
+          checked ? "bg-mint" : "bg-white"
+        }`}
+      >
+        <span
+          className={`absolute top-1/2 h-5 w-5 -translate-y-1/2 rounded-full border-2 border-black bg-white transition-all ${
+            checked ? "left-[26px]" : "left-[2px]"
+          }`}
+        />
+      </button>
     </div>
   );
 }
