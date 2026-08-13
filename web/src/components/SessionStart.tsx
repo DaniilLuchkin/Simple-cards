@@ -9,13 +9,19 @@ export function SessionStart({
   profile,
   dueCount,
   sessionSize,
+  timedSeconds,
+  timedBest,
   onPlay,
+  onPlayTimed,
   onPractice,
 }: {
   profile: Profile | null;
   dueCount: number;
   sessionSize: number;
+  timedSeconds: number;
+  timedBest: number;
   onPlay: () => void;
+  onPlayTimed: () => void;
   onPractice: () => void;
 }) {
   const { t } = usePrefs();
@@ -62,13 +68,28 @@ export function SessionStart({
       {/* Play */}
       <div className="mt-auto flex flex-col gap-2">
         {dueCount > 0 ? (
-          <button
-            type="button"
-            onClick={onPlay}
-            className="rounded-2xl border-2 border-black bg-mint px-4 py-4 text-lg font-bold text-ink shadow-toon"
-          >
-            ▶ {t("play")} · {sessionSize}
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={onPlay}
+              className="rounded-2xl border-2 border-black bg-mint px-4 py-4 text-lg font-bold text-ink shadow-toon"
+            >
+              ▶ {t("play")} · {sessionSize}
+            </button>
+            <button
+              type="button"
+              onClick={onPlayTimed}
+              className="rounded-2xl border-2 border-black bg-butter px-4 py-3 text-base font-bold text-ink shadow-toon-sm"
+            >
+              ⏱ {t("playTimed")} · {timedSeconds}
+              {t("timedLeft")}
+              {timedBest > 0 && (
+                <span className="ml-2 text-xs font-semibold opacity-70">
+                  {t("record")}: {timedBest}
+                </span>
+              )}
+            </button>
+          </>
         ) : (
           <div className="rounded-2xl border-2 border-black bg-surface p-5 text-center shadow-toon">
             <p className="text-2xl">🎉</p>

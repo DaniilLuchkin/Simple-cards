@@ -10,6 +10,8 @@ export function SessionSummary({
   reviewed,
   correct,
   bestCombo,
+  timed,
+  record,
   profile,
   canPlayAgain,
   onPlayAgain,
@@ -18,6 +20,9 @@ export function SessionSummary({
   reviewed: number;
   correct: number;
   bestCombo: number;
+  /** Timed round: the card count reads as a score, and a new best is called out. */
+  timed: boolean;
+  record: boolean;
   profile: Profile | null;
   canPlayAgain: boolean;
   onPlayAgain: () => void;
@@ -36,14 +41,14 @@ export function SessionSummary({
           animate={{ scale: 1, opacity: 1 }}
           transition={{ type: "spring", stiffness: 260, damping: 18 }}
         >
-          <p className="text-4xl">{goalMet ? "🏆" : "✨"}</p>
+          <p className="text-4xl">{record ? "🏆" : goalMet ? "🏆" : "✨"}</p>
           <p className="mt-2 text-xl font-bold text-ink">
-            {goalMet ? t("goalMet") : t("roundDone")}
+            {record ? t("newRecord") : goalMet ? t("goalMet") : t("roundDone")}
           </p>
         </motion.div>
 
         <div className="mt-5 grid grid-cols-3 gap-2">
-          <Stat value={String(reviewed)} label={t("statCards")} />
+          <Stat value={String(reviewed)} label={timed ? t("timedScore") : t("statCards")} />
           <Stat value={`${accuracy}%`} label={t("statAccuracy")} />
           <Stat value={`🔥${bestCombo}`} label={t("statCombo")} />
         </div>

@@ -36,9 +36,36 @@ function sm2Snapshot(card: Card): Sm2Snapshot {
 
 type UndoInfo = { card: Card; snapshot: Sm2Snapshot; practice: boolean };
 
+// How long a timed round lasts, and where its personal best is kept (a single
+// local number - no server field needed).
+const TIMED_SECONDS = 60;
+const TIMED_BEST_KEY = "timedBest";
+
+function readTimedBest(): number {
+  const raw = Number(localStorage.getItem(TIMED_BEST_KEY));
+  return Number.isFinite(raw) && raw > 0 ? raw : 0;
+}
+
+export type SessionMode = "normal" | "timed";
+
 // A round in progress: how long it is and how it's going so far.
-type SessionState = { size: number; done: number; correct: number; combo: number; best: number };
-type SessionResult = { reviewed: number; correct: number; bestCombo: number };
+type SessionState = {
+  mode: SessionMode;
+  size: number;
+  /** Wall-clock end for a timed round; null for a normal one. */
+  endsAt: number | null;
+  done: number;
+  correct: number;
+  combo: number;
+  best: number;
+};
+type SessionResult = {
+  reviewed: number;
+  correct: number;
+  bestCombo: number;
+  timed: boolean;
+  record: boolean;
+};
 
 // A round runs until the daily goal is met; when it's already met (or the deck
 // is short) fall back to a small fixed round so there's always something to play.
@@ -61,6 +88,9 @@ export function App() {
   // Review is played in rounds: lobby -> playing -> summary.
   const [session, setSession] = useState<SessionState | null>(null);
   const [summary, setSummary] = useState<SessionResult | null>(null);
+  const [timedBest, setTimedBest] = useState(readTimedBest);
+  // Ticks only while a timed round is live, to drive the countdown.
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
     api.getDueCards().then((res) => setDueCards(res.cards)).catch((err) => setError(String(err)));
@@ -87,6 +117,24 @@ export function App() {
     // Intentionally run once on mount only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Timed round: tick the clock and end the round when it runs out. `session`
+  // is read through a ref-free closure by re-running whenever it changes, and
+  // the interval is torn down as soon as the round is over.
+  useEffect(() => {
+    if (!session?.endsAt) return;
+    setNow(Date.now());
+    const id = window.setInterval(() => {
+      const t = Date.now();
+      setNow(t);
+      if (t >= session.endsAt!) {
+        window.clearInterval(id);
+        finishSession(session);
+      }
+    }, 250);
+    return () => window.clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session]);
 
   useEffect(() => {
     if (tab === "library" && allCards === null) {
@@ -130,20 +178,47 @@ export function App() {
       console.error("Failed to record review", err);
     }
 
-    if (next && next.done >= next.size) await finishSession(next);
+    if (!next) return;
+    // A normal round ends at its card count; a timed one runs until the clock
+    // stops, or early if the deck runs dry.
+    const deckEmpty = (dueCards?.length ?? 0) <= 1;
+    const over =
+      next.mode === "timed" ? deckEmpty : next.done >= next.size || deckEmpty;
+    if (over) await finishSession(next);
   }
 
-  function startSession() {
+  function startSession(mode: SessionMode = "normal") {
     const size = plannedSessionSize(profile, dueCards?.length ?? 0);
     setSummary(null);
-    setSession({ size, done: 0, correct: 0, combo: 0, best: 0 });
+    setSession({
+      mode,
+      size,
+      endsAt: mode === "timed" ? Date.now() + TIMED_SECONDS * 1000 : null,
+      done: 0,
+      correct: 0,
+      combo: 0,
+      best: 0,
+    });
   }
 
   // Ends the round: record it server-side (which settles quests and the streak)
   // and switch to the summary screen.
   async function finishSession(state: SessionState) {
+    const timed = state.mode === "timed";
+    const record = timed && state.done > timedBest;
+    if (record) {
+      setTimedBest(state.done);
+      localStorage.setItem(TIMED_BEST_KEY, String(state.done));
+    }
+
     setSession(null);
-    setSummary({ reviewed: state.done, correct: state.correct, bestCombo: state.best });
+    setSummary({
+      reviewed: state.done,
+      correct: state.correct,
+      bestCombo: state.best,
+      timed,
+      record,
+    });
     try {
       const { profile: updated } = await api.completeSession(state.best);
       setProfile(updated);
@@ -263,9 +338,11 @@ export function App() {
               reviewed={summary.reviewed}
               correct={summary.correct}
               bestCombo={summary.bestCombo}
+              timed={summary.timed}
+              record={summary.record}
               profile={profile}
               canPlayAgain={(dueCards?.length ?? 0) > 0}
-              onPlayAgain={startSession}
+              onPlayAgain={() => startSession(summary.timed ? "timed" : "normal")}
               onDone={() => setSummary(null)}
             />
           ) : session || practice ? (
@@ -277,6 +354,9 @@ export function App() {
               combo={session?.combo ?? 0}
               sessionDone={session?.done ?? 0}
               sessionSize={session?.size ?? 0}
+              timed={session?.mode === "timed"}
+              secondsLeft={session?.endsAt ? Math.max(0, (session.endsAt - now) / 1000) : 0}
+              totalSeconds={TIMED_SECONDS}
               onUndo={handleUndo}
               onStartPractice={startPractice}
               onGraded={handleGraded}
@@ -291,7 +371,10 @@ export function App() {
               profile={profile}
               dueCount={dueCards?.length ?? 0}
               sessionSize={plannedSessionSize(profile, dueCards?.length ?? 0)}
-              onPlay={startSession}
+              timedSeconds={TIMED_SECONDS}
+              timedBest={timedBest}
+              onPlay={() => startSession("normal")}
+              onPlayTimed={() => startSession("timed")}
               onPractice={startPractice}
             />
           )

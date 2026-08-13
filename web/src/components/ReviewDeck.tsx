@@ -17,6 +17,9 @@ export function ReviewDeck({
   combo,
   sessionDone,
   sessionSize,
+  timed,
+  secondsLeft,
+  totalSeconds,
   onUndo,
   onStartPractice,
   onGraded,
@@ -35,6 +38,10 @@ export function ReviewDeck({
   /** Cards graded so far in this round, and the round's length. */
   sessionDone: number;
   sessionSize: number;
+  /** Timed round: a countdown replaces the pips (size is meaningless then). */
+  timed: boolean;
+  secondsLeft: number;
+  totalSeconds: number;
   onUndo: () => void;
   onStartPractice: () => void;
   onGraded: (card: Card, grade: Grade) => void;
@@ -109,7 +116,14 @@ export function ReviewDeck({
       {practice ? (
         <p className="text-center text-xs text-oncanvas opacity-70">{t("practiceNote")}</p>
       ) : (
-        <SessionBar done={sessionDone} size={sessionSize} combo={combo} />
+        <SessionBar
+          done={sessionDone}
+          size={sessionSize}
+          combo={combo}
+          timed={timed}
+          secondsLeft={secondsLeft}
+          totalSeconds={totalSeconds}
+        />
       )}
 
       <div className="min-h-0 flex-1">
@@ -147,48 +161,103 @@ export function ReviewDeck({
   );
 }
 
-// Round progress: one pip per card plus the live combo badge. Pips stay a row
-// of dots up to a point, then collapse to a bar so long rounds still fit.
-function SessionBar({ done, size, combo }: { done: number; size: number; combo: number }) {
-  const pct = size > 0 ? Math.min(100, Math.round((done / size) * 100)) : 0;
+// Round progress. Deliberately holds NOTHING that appears and disappears mid
+// round: the combo badge used to live here and its mounting resized the
+// flex-1 pips, so the whole bar jumped (and overflowed) on every combo.
+function SessionBar({
+  done,
+  size,
+  combo,
+  timed,
+  secondsLeft,
+  totalSeconds,
+}: {
+  done: number;
+  size: number;
+  combo: number;
+  timed: boolean;
+  secondsLeft: number;
+  totalSeconds: number;
+}) {
+  const { t } = usePrefs();
 
+  if (timed) {
+    const pct = totalSeconds > 0 ? Math.max(0, (secondsLeft / totalSeconds) * 100) : 0;
+    const urgent = secondsLeft <= 10;
+    return (
+      <div className="flex items-center gap-3 px-1">
+        <div className="h-2.5 min-w-0 flex-1 overflow-hidden rounded-full border-2 border-black bg-white">
+          <div
+            className={`h-full transition-[width] duration-200 ease-linear ${
+              urgent ? "bg-grade-again" : "bg-mint"
+            }`}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        <span
+          className={`shrink-0 text-xs font-semibold tabular-nums ${
+            urgent ? "text-red-500" : "text-oncanvas opacity-70"
+          }`}
+        >
+          {Math.ceil(secondsLeft)}
+          {t("timedLeft")}
+        </span>
+        <span className="shrink-0 text-xs font-semibold tabular-nums text-oncanvas opacity-70">
+          {done}
+        </span>
+        <ComboSlot combo={combo} />
+      </div>
+    );
+  }
+
+  const pct = size > 0 ? Math.min(100, Math.round((done / size) * 100)) : 0;
   return (
     <div className="flex items-center gap-3 px-1">
       {size <= 12 ? (
-        <div className="flex flex-1 items-center gap-1">
+        <div className="flex min-w-0 flex-1 items-center gap-1">
           {Array.from({ length: size }, (_, i) => (
             <span
               key={i}
-              className={`h-2.5 flex-1 rounded-full border-2 border-black transition-colors ${
+              className={`h-2.5 min-w-0 flex-1 rounded-full border-2 border-black transition-colors ${
                 i < done ? "bg-mint" : "bg-white"
               }`}
             />
           ))}
         </div>
       ) : (
-        <div className="h-2.5 flex-1 overflow-hidden rounded-full border-2 border-black bg-white">
+        <div className="h-2.5 min-w-0 flex-1 overflow-hidden rounded-full border-2 border-black bg-white">
           <div className="h-full bg-mint transition-all" style={{ width: `${pct}%` }} />
         </div>
       )}
 
-      <span className="shrink-0 text-xs font-semibold text-oncanvas opacity-70">
+      <span className="shrink-0 text-xs font-semibold tabular-nums text-oncanvas opacity-70">
         {done}/{size}
       </span>
+      <ComboSlot combo={combo} />
+    </div>
+  );
+}
 
+// The combo lives in a fixed-width slot that is ALWAYS rendered, so the badge
+// popping in and out can't resize the pips next to it. Floating it over the card
+// was the other option, but there it covered the flip control.
+function ComboSlot({ combo }: { combo: number }) {
+  return (
+    <span className="flex w-[52px] shrink-0 items-center justify-end">
       <AnimatePresence>
         {combo >= 2 && (
           <motion.span
             key={combo}
-            initial={{ scale: 0.6, opacity: 0 }}
+            initial={{ scale: 0.5, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.6, opacity: 0 }}
+            exit={{ scale: 0.5, opacity: 0 }}
             transition={{ type: "spring", stiffness: 400, damping: 15 }}
-            className="shrink-0 rounded-full border-2 border-black bg-butter px-2 py-0.5 text-xs font-bold text-ink shadow-toon-sm"
+            className="rounded-full border-2 border-black bg-butter px-1.5 py-0.5 text-xs font-bold leading-none text-ink shadow-toon-sm"
           >
-            🔥 x{combo}
+            🔥{combo}
           </motion.span>
         )}
       </AnimatePresence>
-    </div>
+    </span>
   );
 }
