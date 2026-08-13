@@ -6,6 +6,7 @@ type TelegramWebApp = {
   setHeaderColor: (color: string) => void;
   setBackgroundColor: (color: string) => void;
   disableVerticalSwipes?: () => void;
+  openTelegramLink?: (url: string) => void;
   HapticFeedback?: {
     impactOccurred: (style: "light" | "medium" | "heavy" | "rigid" | "soft") => void;
     notificationOccurred: (type: "error" | "success" | "warning") => void;
@@ -42,4 +43,13 @@ export function getInitData(): string {
 
 export function haptic(style: "light" | "medium" | "heavy" = "light") {
   getTelegramWebApp()?.HapticFeedback?.impactOccurred(style);
+}
+
+// Opens Telegram's "share to a chat" sheet for the given link + text. Uses the
+// in-app openTelegramLink when available (stays inside Telegram), else a tab.
+export function shareToTelegram(url: string, text: string) {
+  const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`;
+  const webApp = getTelegramWebApp();
+  if (webApp?.openTelegramLink) webApp.openTelegramLink(shareUrl);
+  else window.open(shareUrl, "_blank");
 }

@@ -5,9 +5,11 @@ import {
   createCard,
   createCardFromFields,
   createCardFromImage,
+  creditReferral,
   getOrCreateUser,
   updateProfile,
 } from "./services.js";
+import { setBotUsername } from "./botInfo.js";
 import { LANGUAGE_NATIVE_NAMES } from "./languages.js";
 import { saveImage } from "./storage.js";
 import { parseWordInput } from "./parseInput.js";
@@ -67,6 +69,10 @@ function languageKeyboard(): InlineKeyboard {
  */
 export async function setupBotProfile() {
   try {
+    // Cache the bot @username for building referral deep links.
+    const me = await bot.api.getMe();
+    setBotUsername(me.username ?? null);
+
     await bot.api.setMyCommands([
       { command: "start", description: "Как пользоваться ботом" },
       { command: "app", description: "Открыть Simple Cards" },
@@ -89,7 +95,23 @@ export async function setupBotProfile() {
   }
 }
 
-bot.command("start", (ctx) => ctx.reply(WELCOME_TEXT, { reply_markup: miniAppKeyboard }));
+bot.command("start", async (ctx) => {
+  // Referral deep link: /start ref_<referrerUserId>. Only attribute genuinely
+  // new users (account created just now), so an existing user clicking a link
+  // isn't reassigned.
+  const payload = ctx.match?.trim();
+  if (payload?.startsWith("ref_")) {
+    try {
+      const user = await userFromCtx(ctx);
+      if (Date.now() - user.createdAt.getTime() < 60_000) {
+        await creditReferral(user.id, payload.slice("ref_".length));
+      }
+    } catch (err) {
+      console.error("Referral credit failed", err);
+    }
+  }
+  await ctx.reply(WELCOME_TEXT, { reply_markup: miniAppKeyboard });
+});
 
 bot.command("app", (ctx) =>
   ctx.reply("Открой Simple Cards, чтобы повторять карточки:", { reply_markup: miniAppKeyboard })

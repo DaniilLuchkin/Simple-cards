@@ -89,6 +89,9 @@ export type Profile = {
   showMilestones: boolean;
   // Cards mature enough to count as "learned".
   learnedCount: number;
+  // Referral deep link (null when unknown) + how many friends this user invited.
+  referralLink: string | null;
+  referralCount: number;
   todayCount: number;
   streak: number;
   // { "2026-07-03": 12, ... }

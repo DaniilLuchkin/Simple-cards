@@ -12,6 +12,7 @@ import type { GeneratedCardFields, Levels } from "./llm.js";
 import { languageNames } from "./languages.js";
 import type { Languages } from "./languages.js";
 import { absoluteImageUrl, saveImage } from "./storage.js";
+import { referralLink } from "./botInfo.js";
 
 // Maps generated fields onto the Card columns. `word`/`example` mirror
 // `headword`/filled-sentence for the library preview and legacy compatibility.
@@ -56,6 +57,18 @@ export async function getOrCreateUser(input: {
       username: input.username,
       firstName: input.firstName,
     },
+  });
+}
+
+// Attributes `userId` to `referrerId` (from a ref deep link), but only once and
+// never to self or a non-existent referrer. Safe to call on every /start.
+export async function creditReferral(userId: string, referrerId: string) {
+  if (userId === referrerId) return;
+  const referrer = await prisma.user.findUnique({ where: { id: referrerId }, select: { id: true } });
+  if (!referrer) return;
+  await prisma.user.updateMany({
+    where: { id: userId, referredById: null },
+    data: { referredById: referrerId },
   });
 }
 
@@ -309,6 +322,9 @@ export type Profile = {
   showMilestones: boolean;
   // Cards whose SRS interval is mature enough to count as "learned".
   learnedCount: number;
+  // Referral deep link (null when the bot username isn't known) + invites made.
+  referralLink: string | null;
+  referralCount: number;
   todayCount: number;
   streak: number;
   // { "2026-07-03": 12, ... } for roughly the last ~130 days.
@@ -336,9 +352,10 @@ export async function getProfile(userId: string): Promise<Profile> {
     },
   });
 
-  const learnedCount = await prisma.card.count({
-    where: { userId, interval: { gte: LEARNED_INTERVAL_DAYS } },
-  });
+  const [learnedCount, referralCount] = await Promise.all([
+    prisma.card.count({ where: { userId, interval: { gte: LEARNED_INTERVAL_DAYS } } }),
+    prisma.user.count({ where: { referredById: userId } }),
+  ]);
 
   const since = localDay(user.timezone);
   since.setUTCDate(since.getUTCDate() - 132);
@@ -375,6 +392,8 @@ export async function getProfile(userId: string): Promise<Profile> {
     targetLevel: user.targetLevel,
     showMilestones: user.showMilestones,
     learnedCount,
+    referralLink: referralLink(userId),
+    referralCount,
     todayCount,
     streak,
     activity,

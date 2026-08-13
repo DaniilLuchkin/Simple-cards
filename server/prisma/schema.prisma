@@ -44,6 +44,10 @@ model User {
   reminderEnabled Boolean   @default(true)
   lastReminderAt  DateTime?
 
+  // The user id (this table) who referred this user, set once on first /start
+  // via a ref link. Plain column (no relation) - we only count referrals.
+  referredById String?
+
   cards      Card[]
   reviewDays ReviewDay[]
 }

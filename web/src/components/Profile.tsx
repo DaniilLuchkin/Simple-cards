@@ -5,6 +5,7 @@ import type { Palette } from "../lib/prefs";
 import { LanguageSelect } from "./LanguageSelect";
 import { ActivityHeatmap } from "./ActivityHeatmap";
 import { LearnedProgress } from "./LearnedProgress";
+import { shareToTelegram } from "../lib/telegram";
 
 const PALETTE_LABEL: Record<Palette, "bgLavender" | "bgMint" | "bgSky"> = {
   lavender: "bgLavender",
@@ -33,6 +34,14 @@ export function Profile({
     if (clamped !== profile.dailyGoal) onUpdate({ dailyGoal: clamped });
   }
 
+  function shareInvite() {
+    if (!profile.referralLink) return;
+    const text = t("shareText")
+      .replace("{n}", String(profile.learnedCount))
+      .replace("{s}", String(profile.streak));
+    shareToTelegram(profile.referralLink, text);
+  }
+
   return (
     <div className="-mx-2 flex h-full flex-col gap-5 overflow-y-auto px-2 pb-8 pt-1">
       {/* Streak + today's progress */}
@@ -55,6 +64,26 @@ export function Profile({
 
       {/* Words learned + real-world milestones */}
       <LearnedProgress learned={profile.learnedCount} showMilestones={profile.showMilestones} />
+
+      {/* Invite friends (referral) */}
+      {profile.referralLink && (
+        <div className="rounded-2xl border-2 border-black bg-sky p-5 shadow-toon">
+          <p className="text-sm font-semibold text-ink">{t("inviteTitle")}</p>
+          <p className="mt-1 text-xs text-ink/70">{t("inviteHint")}</p>
+          <button
+            type="button"
+            onClick={shareInvite}
+            className="mt-3 w-full rounded-xl border-2 border-black bg-white px-4 py-2.5 text-sm font-semibold text-ink shadow-toon-sm"
+          >
+            📤 {t("shareBtn")}
+          </button>
+          {profile.referralCount > 0 && (
+            <p className="mt-2 text-center text-xs text-ink/70">
+              {t("invited")}: {profile.referralCount}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* My level & goal */}
       <div className="rounded-2xl border-2 border-black bg-surface p-4 shadow-toon">
