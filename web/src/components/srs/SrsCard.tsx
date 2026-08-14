@@ -371,6 +371,18 @@ export function SrsCard({
             {card.explanation && <p className="mt-1 text-sm text-muted">{card.explanation}</p>}
           </div>
 
+          {/* The picture belongs on the answer side: it depicts the meaning, so
+              on a recognition front it would hand over the answer. Height is
+              capped because the sentence, chips and grades all sit below it. */}
+          {card.imageUrl && (
+            <img
+              src={card.imageUrl}
+              alt=""
+              className="mx-auto max-h-40 w-auto max-w-full rounded-2xl border-2 border-black object-contain"
+              onError={(e) => (e.currentTarget.style.display = "none")}
+            />
+          )}
+
           {(card.pos || card.forms.length > 0) && (
             <div className="flex flex-wrap gap-2 text-sm">
               {card.pos && (
