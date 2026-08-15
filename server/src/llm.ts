@@ -223,22 +223,34 @@ export type GrammarExercise =
       sentence: string;
       options: string[];
       answer: string;
+      /** One line shown straight away. */
       explanation: string;
+      /** The full rule, revealed when the learner taps the explanation. */
+      details: string;
     }
   | {
       type: "order";
-      /** Shuffled tokens of `answer` - always derived server-side. */
+      /**
+       * Shuffled display tokens of `answer`: sentence-final punctuation and the
+       * leading capital are removed so the chips don't give away which word
+       * starts and which ends the sentence.
+       */
       words: string[];
       answer: string;
       explanation: string;
+      details: string;
     };
 
 function grammarPrompt(langs: Languages, levels: Levels, count: number): string {
   return `You are a grammar-exercise writer for "Simple Cards", an app for learning ${langs.learning}.
 
 Produce ${count} short exercises, MIXING these two types roughly evenly:
-- {"type":"gap", "sentence": a natural ${langs.learning} sentence with ONE word replaced by the literal token ${GAP}, "answer": the word that belongs in the gap, "options": 4 plausible choices INCLUDING the answer (the wrong ones must be grammatically tempting, e.g. a wrong tense/article/preposition), "explanation": one short line in ${langs.translation} saying WHY the answer is right}
-- {"type":"order", "answer": one natural ${langs.learning} sentence of 4-9 words, "explanation": one short line in ${langs.translation} about the word order rule it shows}
+- {"type":"gap", "sentence": a natural ${langs.learning} sentence with ONE word replaced by the literal token ${GAP}, "answer": the word that belongs in the gap, "options": 4 plausible choices INCLUDING the answer (the wrong ones must be grammatically tempting, e.g. a wrong tense/article/preposition), "explanation": ..., "details": ...}
+- {"type":"order", "answer": one natural ${langs.learning} sentence of 4-9 words, "explanation": ..., "details": ...}
+
+Both types carry two levels of feedback, BOTH written in ${langs.translation}:
+- "explanation": ONE short line - the rule in a nutshell.
+- "details": 2-4 sentences the learner can open for more. Name the rule, say why the tempting wrong answers are wrong (for a gap) or what fixes the word order (for an order task), and finish with one more short ${langs.learning} example sentence showing the same rule. Do not merely repeat "explanation".
 
 Each exercise must test a GRAMMAR point (tense, article, preposition, agreement, word order), not just vocabulary.${levelGuidance(levels)}
 
@@ -265,12 +277,37 @@ export function sentenceTokens(sentence: string): string[] {
   return sentence.trim().split(/\s+/).filter(Boolean);
 }
 
+/**
+ * Tokens to SHOW in a word-order task. A trailing "." marks the last word and a
+ * leading capital marks the first, which hands the learner both ends of the
+ * sentence for free - so both cues are stripped.
+ *
+ * A capital is kept when the token is capitalised mid-sentence anyway (a proper
+ * noun) or is the English pronoun "I". The answer check is case- and
+ * punctuation-insensitive, so an over-eager lowercase never costs a point.
+ */
+export function displayTokens(answer: string): string[] {
+  const raw = sentenceTokens(answer);
+  const properNouns = new Set(
+    raw.slice(1).filter((t) => /^\p{Lu}/u.test(t)).map((t) => t.toLowerCase())
+  );
+
+  return raw.map((token, i) => {
+    const bare = token.replace(/[.!?…]+$/u, "");
+    if (i !== 0) return bare;
+    if (/^I(['’]|$)/.test(bare)) return bare; // English "I", "I'm", "I've"…
+    if (properNouns.has(bare.toLowerCase())) return bare;
+    return bare.charAt(0).toLowerCase() + bare.slice(1);
+  });
+}
+
 // Turns one raw LLM item into a usable exercise, or null when it's malformed.
 // Everything the UI relies on is rebuilt here rather than taken on trust.
 function coerceExercise(raw: unknown): GrammarExercise | null {
   if (!raw || typeof raw !== "object") return null;
   const o = raw as Record<string, unknown>;
   const explanation = typeof o.explanation === "string" ? o.explanation.trim() : "";
+  const details = typeof o.details === "string" ? o.details.trim() : "";
   const answer = typeof o.answer === "string" ? o.answer.trim() : "";
   if (!answer) return null;
 
@@ -283,16 +320,23 @@ function coerceExercise(raw: unknown): GrammarExercise | null {
     const options = [...new Set([answer, ...strings(o.options)])];
     if (options.length < 2) return null;
 
-    return { type: "gap", sentence, options: shuffled(options.slice(0, 4)), answer, explanation };
+    return {
+      type: "gap",
+      sentence,
+      options: shuffled(options.slice(0, 4)),
+      answer,
+      explanation,
+      details,
+    };
   }
 
   if (o.type === "order") {
     // Tokens come from the answer itself: a model-supplied word list routinely
     // disagrees with its own sentence, which would make the exercise unsolvable.
-    const tokens = sentenceTokens(answer);
+    const tokens = displayTokens(answer);
     if (tokens.length < 3) return null;
 
-    return { type: "order", words: shuffled(tokens), answer, explanation };
+    return { type: "order", words: shuffled(tokens), answer, explanation, details };
   }
 
   return null;

@@ -91,9 +91,18 @@ function WordChip({
   );
 }
 
-/** Whitespace-normalised tokens, mirroring the server's sentenceTokens. */
-function tokens(sentence: string): string[] {
-  return sentence.trim().split(/\s+/).filter(Boolean);
+/**
+ * Comparable form of an assembled sentence. The chips deliberately hide the
+ * capital of the first word and the final full stop, so the check has to ignore
+ * both - otherwise a correctly ordered sentence would be marked wrong.
+ */
+function comparable(sentence: string): string {
+  return sentence
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((token) => token.replace(/[.!?…]+$/u, "").toLowerCase())
+    .join(" ");
 }
 
 // A round of grammar drills: one exercise at a time, answer, see why, next.
@@ -119,6 +128,7 @@ export function GrammarSession({
   const [result, setResult] = useState<boolean | null>(null);
   const [picked, setPicked] = useState<string | null>(null);
   const [placed, setPlaced] = useState<number[]>([]);
+  const [showDetails, setShowDetails] = useState(false);
 
   const ex = exercises[index];
   const finished = index >= exercises.length;
@@ -133,6 +143,7 @@ export function GrammarSession({
     setResult(null);
     setPicked(null);
     setPlaced([]);
+    setShowDetails(false);
     setIndex((i) => i + 1);
   }
 
@@ -142,6 +153,7 @@ export function GrammarSession({
     setResult(null);
     setPicked(null);
     setPlaced([]);
+    setShowDetails(false);
     onRestart(); // the caller fetches a fresh batch
   }
 
@@ -284,9 +296,7 @@ export function GrammarSession({
               <button
                 type="button"
                 disabled={!allPlaced}
-                onClick={() =>
-                  answer(placedWords.join(" ") === tokens(ex.answer).join(" "))
-                }
+                onClick={() => answer(comparable(placedWords.join(" ")) === comparable(ex.answer))}
                 className="mt-auto rounded-xl border-2 border-black bg-mint px-4 py-2.5 text-base font-bold text-ink shadow-toon-sm disabled:opacity-50"
               >
                 {t("check")}
@@ -307,7 +317,34 @@ export function GrammarSession({
                 <HighlightedText text={ex.answer} index={wordIndex} onPick={onPickWord} />
               </p>
             )}
-            {ex.explanation && <p className="text-sm text-muted">{ex.explanation}</p>}
+            {ex.explanation &&
+              (ex.details ? (
+                <button
+                  type="button"
+                  onClick={() => setShowDetails((v) => !v)}
+                  aria-expanded={showDetails}
+                  className="rounded-xl border-2 border-dashed border-black/40 p-2.5 text-left"
+                >
+                  <span className="flex items-start justify-between gap-2 text-sm text-muted">
+                    <span>{ex.explanation}</span>
+                    <span aria-hidden className="shrink-0 text-xs">
+                      {showDetails ? "▲" : "▼"}
+                    </span>
+                  </span>
+                  {showDetails && (
+                    <span className="mt-2 block text-sm leading-relaxed text-ink">
+                      {ex.details}
+                    </span>
+                  )}
+                  {!showDetails && (
+                    <span className="mt-1 block text-[11px] font-semibold text-muted">
+                      {t("moreDetails")}
+                    </span>
+                  )}
+                </button>
+              ) : (
+                <p className="text-sm text-muted">{ex.explanation}</p>
+              ))}
           </div>
         )}
       </div>

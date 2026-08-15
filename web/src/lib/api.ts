@@ -87,14 +87,18 @@ export type GrammarExercise =
       sentence: string;
       options: string[];
       answer: string;
+      /** One line shown straight away. */
       explanation: string;
+      /** The full rule, revealed on tap. */
+      details: string;
     }
   | {
       type: "order";
-      /** Shuffled tokens of `answer`. */
+      /** Shuffled tokens of `answer`, stripped of first/last position cues. */
       words: string[];
       answer: string;
       explanation: string;
+      details: string;
     };
 
 // One row of the weekly friends leaderboard.
