@@ -3,6 +3,10 @@ import type { Card, CardPreview } from "../lib/api";
 import { api } from "../lib/api";
 import { usePrefs } from "../lib/prefs";
 
+// Matches the server's generateSetSchema cap, so a long paste is bounded here
+// instead of coming back as an opaque failure.
+const MAX_REQUEST = 2000;
+
 // AI tab: describe a set of cards in natural language, generate a themed batch
 // of ideal flashcards (each with an illustration), then pick which to keep
 // before adding them to the deck.
@@ -78,9 +82,18 @@ export function AiGenerate({ onCreated }: { onCreated: (cards: Card[]) => void }
         value={request}
         onChange={(e) => setRequest(e.target.value)}
         rows={3}
+        maxLength={MAX_REQUEST}
         placeholder={t("aiPlaceholder")}
         className="resize-none rounded-2xl border-2 border-black bg-surface p-3 text-base text-ink shadow-toon outline-none placeholder:text-muted"
       />
+
+      {/* Only once a long paste gets close to the cap, so it never fails
+          opaquely on length. */}
+      {request.length > MAX_REQUEST * 0.8 && (
+        <p className="-mt-1 px-1 text-right text-[11px] text-muted">
+          {request.length}/{MAX_REQUEST}
+        </p>
+      )}
 
       {!previews && (
         <div className="flex flex-wrap gap-2">

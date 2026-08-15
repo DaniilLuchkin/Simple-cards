@@ -332,7 +332,9 @@ cardsRouter.post("/", async (req, res) => {
 // Generate a themed batch of cards (each with an illustration) from a
 // natural-language request. Returns previews only - nothing is saved yet; the
 // user picks which to keep and POSTs them to /generate-set/save.
-const generateSetSchema = z.object({ request: z.string().min(1).max(500) });
+// Roomy enough to paste a vocabulary list, which is a normal use of this tab -
+// 500 rejected a 15-line list of pairs outright.
+const generateSetSchema = z.object({ request: z.string().min(1).max(2000) });
 
 cardsRouter.post("/generate-set", async (req, res) => {
   const parsed = generateSetSchema.safeParse(req.body);

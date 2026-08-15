@@ -167,7 +167,11 @@ export async function generateWordOfDay(
 function cardSetPrompt(langs: Languages, max: number, levels?: Levels): string {
   return `You are a vocabulary curator for "Simple Cards", an app for learning ${langs.learning} vocabulary. The user describes a set of flashcards they want in natural language — a topic, exam, situation, or level, and possibly a number of cards.
 
-Choose genuinely useful, real ${langs.learning} words or phrases that best match the request (varied, non-duplicate, no near-duplicates of each other). Honor the requested number of cards if one is given; otherwise pick about 10. NEVER produce more than ${max} cards. Do NOT include any word from the user's "already has" list.${levelGuidance(levels)}
+Choose genuinely useful, real ${langs.learning} words or phrases that best match the request (varied, non-duplicate, no near-duplicates of each other).
+
+If the request CONTAINS AN EXPLICIT LIST of words or phrases (one per line, or comma-separated), make exactly ONE card per listed item, in the order given - the list itself is the requested number, so do not fall back to a default count and do not silently drop entries. When an entry is a pair like "simple wording - better wording" (the right side may offer "/" alternatives), the card teaches the RIGHT-hand expression: that is what the learner wants to acquire, while the left side is the plain wording it replaces and is useful context for the meaning.
+
+Otherwise honor the requested number of cards if one is given, and pick about 10 when none is. NEVER produce more than ${max} cards. Do NOT include any word from the user's "already has" list.${levelGuidance(levels)}
 
 For EACH chosen word produce a flashcard object with these fields:
 ${fieldRules(langs)}
