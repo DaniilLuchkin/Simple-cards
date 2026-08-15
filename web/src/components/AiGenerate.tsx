@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { Card, CardPreview } from "../lib/api";
 import { api } from "../lib/api";
 import { usePrefs } from "../lib/prefs";
+import { deckArg } from "../lib/decks";
 
 // Matches the server's generateSetSchema cap, so a long paste is bounded here
 // instead of coming back as an opaque failure.
@@ -10,7 +11,14 @@ const MAX_REQUEST = 2000;
 // AI tab: describe a set of cards in natural language, generate a themed batch
 // of ideal flashcards (each with an illustration), then pick which to keep
 // before adding them to the deck.
-export function AiGenerate({ onCreated }: { onCreated: (cards: Card[]) => void }) {
+export function AiGenerate({
+  onCreated,
+  askDeck,
+}: {
+  onCreated: (cards: Card[]) => void;
+  /** Which deck to save into; resolves to null if the user backs out. */
+  askDeck: () => Promise<string | null>;
+}) {
   const { t } = usePrefs();
   const [request, setRequest] = useState("");
   const [busy, setBusy] = useState(false);
@@ -57,11 +65,14 @@ export function AiGenerate({ onCreated }: { onCreated: (cards: Card[]) => void }
     if (!previews || saving) return;
     const chosen = previews.filter((c) => checked.has(c.id));
     if (!chosen.length) return;
+    const deck = await askDeck();
+    if (deck === null) return;
     setSaving(true);
     setError(null);
     try {
       const { cards } = await api.saveCardSet(
-        chosen.map((c) => ({ fields: c.fields, imageUrl: c.imageUrl }))
+        chosen.map((c) => ({ fields: c.fields, imageUrl: c.imageUrl })),
+        deckArg(deck)
       );
       onCreated(cards);
       setPreviews(null);

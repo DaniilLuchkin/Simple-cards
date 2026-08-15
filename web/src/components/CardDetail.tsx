@@ -1,21 +1,24 @@
 import { useState } from "react";
-import type { Card, Grade } from "../lib/api";
+import type { Card, Deck, Grade } from "../lib/api";
 import { api } from "../lib/api";
 import { usePrefs } from "../lib/prefs";
 import { SrsCard } from "./srs/SrsCard";
 import { toSrsCard } from "../lib/srsAdapter";
+import { DeckChips } from "./DeckChips";
 
 // Opening a card from "My cards" shows the same ideal flashcard as during
 // review (flip, long-press edit, image upload/generate, grade buttons), plus
 // delete/regenerate actions.
 export function CardDetail({
   card,
+  decks,
   learningLang,
   onClose,
   onUpdated,
   onDeleted,
 }: {
   card: Card;
+  decks: Deck[];
   learningLang: string;
   onClose: () => void;
   onUpdated: (card: Card) => void;
@@ -96,6 +99,16 @@ export function CardDetail({
           onUploadImage={handleUploadImage}
           onGenerateImage={handleGenerateImage}
         />
+
+        {/* Move the card between decks; the general deck is "no deck". */}
+        <div className="mt-4">
+          <p className="px-1 pb-1 text-xs font-semibold text-oncanvas opacity-70">{t("deckManage")}</p>
+          <DeckChips
+            decks={decks}
+            value={card.deckId ?? "none"}
+            onChange={(value) => handleEdit({ deckId: value === "none" ? null : value ?? null })}
+          />
+        </div>
       </div>
 
       <div className="flex items-center justify-center gap-3 p-4 pb-[max(env(safe-area-inset-bottom),1rem)]">

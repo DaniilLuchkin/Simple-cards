@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "./lib/api";
 import type {
   Card,
+  Deck,
+  DeckFilter,
   Grade,
   GrammarExercise,
   Profile as ProfileData,
@@ -21,6 +23,16 @@ import { SessionStart } from "./components/SessionStart";
 import { SessionSummary } from "./components/SessionSummary";
 import { GrammarSession } from "./components/GrammarSession";
 import { CardPeek } from "./components/CardPeek";
+import { DeckPickerSheet } from "./components/DeckPickerSheet";
+import {
+  deckArg,
+  inDeck,
+  readSaveDeck,
+  readStudyDeck,
+  withCounts,
+  writeSaveDeck,
+  writeStudyDeck,
+} from "./lib/decks";
 import { buildWordIndex } from "./lib/wordIndex";
 import { isFasterThan } from "./lib/format";
 import type { TimedBest } from "./lib/format";
@@ -124,11 +136,28 @@ export function App() {
   const [peekCard, setPeekCard] = useState<Card | null>(null);
   const [timedSeconds, setTimedSeconds] = useState(readTimedSeconds);
   const [timedBest, setTimedBest] = useState<TimedBest | null>(readTimedBest);
+  // Decks: what exists, which one is being studied, and which one new cards go
+  // to. Both choices are remembered across sessions.
+  const [decks, setDecks] = useState<Deck[]>([]);
+  const [studyDeck, setStudyDeck] = useState<DeckFilter>(readStudyDeck);
+  const [saveDeck, setSaveDeck] = useState<string>(readSaveDeck);
+  // The pending "which deck?" ask; its resolver is called by the sheet.
+  const [deckAsk, setDeckAsk] = useState<{ resolve: (value: string | null) => void } | null>(null);
   // Ticks only while a timed round is live, to drive the countdown.
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
-    api.getDueCards().then((res) => setDueCards(res.cards)).catch((err) => setError(String(err)));
+    // A deck remembered on this device may have been deleted elsewhere - drop
+    // the stale choice rather than filtering everything away.
+    api
+      .listDecks()
+      .then((res) => {
+        setDecks(res.decks);
+        const ids = new Set(res.decks.map((d) => d.id));
+        setStudyDeck((prev) => (prev && prev !== "none" && !ids.has(prev) ? undefined : prev));
+        setSaveDeck((prev) => (prev !== "none" && !ids.has(prev) ? "none" : prev));
+      })
+      .catch((err) => console.error("Failed to load decks", err));
 
     // The bot's /language command sets interfaceLanguage server-side - it's
     // the source of truth when present, overriding whatever this device
@@ -152,6 +181,20 @@ export function App() {
     // Intentionally run once on mount only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Due cards follow the chosen study deck, so the lobby count and the round
+  // size always describe what will actually be played.
+  useEffect(() => {
+    writeStudyDeck(studyDeck);
+    let live = true;
+    api
+      .getDueCards(studyDeck)
+      .then((res) => live && setDueCards(res.cards))
+      .catch((err) => setError(String(err)));
+    return () => {
+      live = false;
+    };
+  }, [studyDeck]);
 
   // Timed round: tick the clock and end the round when it runs out. `session`
   // is read through a ref-free closure by re-running whenever it changes, and
@@ -315,14 +358,63 @@ export function App() {
 
   function addCards(cards: Card[]) {
     if (!cards.length) return;
-    setDueCards((prev) => [...cards, ...(prev ?? [])]);
+    // Only cards that belong to the deck being studied join the review queue;
+    // the rest are still saved and show up under their own deck.
+    const forReview = inDeck(cards, studyDeck);
+    if (forReview.length) setDueCards((prev) => [...forReview, ...(prev ?? [])]);
     setAllCards((prev) => (prev ? [...cards, ...prev] : prev));
+  }
+
+  // Asks which deck to save into, pre-selected with the last choice, and
+  // remembers whatever is confirmed. Resolves to null if the user backs out.
+  // Cards made in the bot never go through here - they land in the general deck.
+  function askDeck(): Promise<string | null> {
+    return new Promise((resolve) => setDeckAsk({ resolve }));
+  }
+
+  function answerDeck(value: string | null) {
+    if (value !== null) {
+      setSaveDeck(value);
+      writeSaveDeck(value);
+    }
+    deckAsk?.resolve(value);
+    setDeckAsk(null);
+  }
+
+  async function handleCreateDeck(name: string): Promise<Deck> {
+    const { deck } = await api.createDeck(name);
+    setDecks((prev) => [...prev, deck]);
+    return deck;
+  }
+
+  async function handleRenameDeck(id: string, name: string) {
+    setDecks((prev) => prev.map((d) => (d.id === id ? { ...d, name } : d)));
+    await api.renameDeck(id, name);
+  }
+
+  // The deck's cards are not deleted: the server nulls their deckId, so mirror
+  // that locally and they reappear under the general deck.
+  async function handleDeleteDeck(id: string) {
+    await api.deleteDeck(id);
+    setDecks((prev) => prev.filter((d) => d.id !== id));
+    const orphan = (cards: Card[] | null) =>
+      cards?.map((c) => (c.deckId === id ? { ...c, deckId: null } : c)) ?? cards;
+    setAllCards(orphan);
+    setDueCards(orphan);
+    setPracticeCards(orphan);
+    if (studyDeck === id) setStudyDeck(undefined);
+    if (saveDeck === id) {
+      setSaveDeck("none");
+      writeSaveDeck("none");
+    }
   }
 
   // Capture a photo -> generate a new card -> put it at the front of the review
   // deck and switch to the Review tab so the user sees it right away.
   async function handleCaptureCard(file: File) {
-    const { card } = await api.createCardFromImage(file);
+    const deck = await askDeck();
+    if (deck === null) return;
+    const { card } = await api.createCardFromImage(file, deckArg(deck));
     addNewCard(card);
     setTab("review");
   }
@@ -345,12 +437,13 @@ export function App() {
     }
   }
 
+  // Extra practice draws on the deck being studied, like a round does.
   function startPractice() {
     api
       .getAllCards()
       .then((res) => {
         setAllCards(res.cards);
-        setPracticeCards(shuffle(res.cards));
+        setPracticeCards(shuffle(inDeck(res.cards, studyDeck)));
       })
       .catch((err) => setError(String(err)));
   }
@@ -376,6 +469,9 @@ export function App() {
   const practice = practiceCards !== null;
   const reviewCards = practiceCards ?? dueCards;
   const wordIndex = useMemo(() => buildWordIndex(allCards ?? []), [allCards]);
+  // Counts come from the cards already in memory when they're loaded, so the
+  // chips stay honest right after a card is added, moved or deleted.
+  const deckList = useMemo(() => withCounts(decks, allCards), [decks, allCards]);
 
   return (
     <div className="mx-auto flex h-[100dvh] max-w-md flex-col overflow-hidden px-4 pt-[max(env(safe-area-inset-top),0.5rem)]">
@@ -384,13 +480,14 @@ export function App() {
       <main className="min-h-0 flex-1 pb-[max(env(safe-area-inset-bottom),0.5rem)]">
         {error && <p className="p-4 text-center text-sm text-red-500">{error}</p>}
 
-        {!error && tab === "ai" && <AiGenerate onCreated={addCards} />}
+        {!error && tab === "ai" && <AiGenerate onCreated={addCards} askDeck={askDeck} />}
 
         {!error && tab === "translator" && (
           <Translator
             learningLang={profile?.learningLanguage ?? "en"}
             nativeLang={profile?.translationLanguage ?? "ru"}
             onCardCreated={addNewCard}
+            askDeck={askDeck}
           />
         )}
 
@@ -452,6 +549,9 @@ export function App() {
               profile={profile}
               dueCount={dueCards?.length ?? 0}
               sessionSize={plannedSessionSize(profile, dueCards?.length ?? 0)}
+              decks={deckList}
+              deckId={studyDeck}
+              onDeckChange={setStudyDeck}
               timedSeconds={timedSeconds}
               timedBest={timedBest}
               onPlay={() => startSession("normal")}
@@ -469,9 +569,13 @@ export function App() {
           ) : (
             <Library
               cards={allCards}
+              decks={decks}
               learningLang={profile?.learningLanguage ?? "en"}
               onCardUpdated={handleCardUpdated}
               onCardDeleted={handleCardDeleted}
+              onCreateDeck={handleCreateDeck}
+              onRenameDeck={handleRenameDeck}
+              onDeleteDeck={handleDeleteDeck}
             />
           )
         )}
@@ -484,6 +588,16 @@ export function App() {
           )
         )}
       </main>
+
+      {deckAsk && (
+        <DeckPickerSheet
+          decks={decks}
+          value={saveDeck}
+          onCreate={handleCreateDeck}
+          onConfirm={answerDeck}
+          onCancel={() => answerDeck(null)}
+        />
+      )}
 
       {peekCard && (
         <CardPeek

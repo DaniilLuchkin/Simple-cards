@@ -21,6 +21,8 @@ export type Card = {
   explanation: string;
   translation: string;
   imageUrl: string | null;
+  /** null = the general deck. */
+  deckId: string | null;
   // Rich SRS fields (may be null/empty on cards created before the extension).
   ipa: string | null;
   pos: string | null;
@@ -39,6 +41,13 @@ export type Card = {
   dueAt: string;
   lastReviewedAt: string | null;
 };
+
+// A named group of cards. The general deck is not one of these: cards with no
+// deck belong to it, and the UI shows it as a built-in chip.
+export type Deck = { id: string; name: string; cardCount: number };
+
+/** Deck selection: undefined = every card, "none" = the general deck. */
+export type DeckFilter = string | undefined;
 
 export type Sm2Snapshot = Pick<
   Card,
@@ -153,6 +162,9 @@ export type ProfileUpdate = Partial<
   >
 >;
 
+const deckQuery = (deckId?: DeckFilter) =>
+  deckId ? `?deckId=${encodeURIComponent(deckId)}` : "";
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     ...init,
@@ -173,8 +185,19 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  getDueCards: () => request<{ cards: Card[] }>("/api/cards/due"),
-  getAllCards: () => request<{ cards: Card[] }>("/api/cards"),
+  // deckId: undefined = every card, "none" = the general deck, else that deck.
+  getDueCards: (deckId?: DeckFilter) =>
+    request<{ cards: Card[] }>(`/api/cards/due${deckQuery(deckId)}`),
+  getAllCards: (deckId?: DeckFilter) =>
+    request<{ cards: Card[] }>(`/api/cards${deckQuery(deckId)}`),
+
+  listDecks: () => request<{ decks: Deck[]; generalCount: number }>("/api/decks"),
+  createDeck: (name: string) =>
+    request<{ deck: Deck }>("/api/decks", { method: "POST", body: JSON.stringify({ name }) }),
+  renameDeck: (id: string, name: string) =>
+    request<{ ok: true }>(`/api/decks/${id}`, { method: "PATCH", body: JSON.stringify({ name }) }),
+  // The deck's cards survive: they fall back to the general deck.
+  deleteDeck: (id: string) => request<void>(`/api/decks/${id}`, { method: "DELETE" }),
   reviewCard: (id: string, quality: "remembered" | "forgot") =>
     request<{ card: Card }>(`/api/cards/${id}/review`, {
       method: "POST",
@@ -212,6 +235,8 @@ export const api = {
         | "pos"
         | "forms"
         | "collocations"
+        // Moving the card between decks; null returns it to the general deck.
+        | "deckId"
       >
     >
   ) =>
@@ -239,8 +264,9 @@ export const api = {
   generateCardImage: (id: string) =>
     request<{ card: Card }>(`/api/cards/${id}/image/generate`, { method: "POST" }),
   // Creates a new card from a captured photo (raw image body, not JSON).
-  createCardFromImage: async (file: File): Promise<{ card: Card }> => {
-    const res = await fetch(`${API_URL}/api/cards/from-image`, {
+  createCardFromImage: async (file: File, deckId?: string): Promise<{ card: Card }> => {
+    // The body is the image, so the deck travels as a query param.
+    const res = await fetch(`${API_URL}/api/cards/from-image${deckId ? `?deckId=${deckId}` : ""}`, {
       method: "POST",
       headers: {
         "Content-Type": file.type || "image/jpeg",
@@ -255,10 +281,10 @@ export const api = {
     return res.json() as Promise<{ card: Card }>;
   },
   // Create a card from a word/phrase (e.g. from the translator).
-  createCard: (word: string, example?: string) =>
+  createCard: (word: string, example?: string, deckId?: string) =>
     request<{ card: Card }>("/api/cards", {
       method: "POST",
-      body: JSON.stringify({ word, example }),
+      body: JSON.stringify({ word, example, deckId }),
     }),
   translate: (text: string, from: string, to: string) =>
     request<{ translation: string }>("/api/translate", {
@@ -273,10 +299,13 @@ export const api = {
       body: JSON.stringify({ request: request_ }),
     }),
   // Persist the previews the user chose to keep.
-  saveCardSet: (cards: { fields: GeneratedFields; imageUrl: string | null }[]) =>
+  saveCardSet: (
+    cards: { fields: GeneratedFields; imageUrl: string | null }[],
+    deckId?: string
+  ) =>
     request<{ cards: Card[] }>("/api/cards/generate-set/save", {
       method: "POST",
-      body: JSON.stringify({ cards }),
+      body: JSON.stringify({ cards, deckId }),
     }),
   getProfile: () => request<{ profile: Profile }>("/api/me"),
   getLeague: () => request<{ entries: LeagueEntry[] }>("/api/me/league"),

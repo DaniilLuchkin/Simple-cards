@@ -1,9 +1,10 @@
 import { useState } from "react";
-import type { Profile } from "../lib/api";
+import type { Deck, DeckFilter, Profile } from "../lib/api";
 import { usePrefs } from "../lib/prefs";
 import { cardsPerMinute, formatDuration } from "../lib/format";
 import type { TimedBest } from "../lib/format";
 import { QuestList } from "./QuestList";
+import { DeckChips } from "./DeckChips";
 
 // Timed-round length: 30s … 5min, in 15s steps.
 const MIN_SECONDS = 30;
@@ -17,6 +18,9 @@ export function SessionStart({
   profile,
   dueCount,
   sessionSize,
+  decks,
+  deckId,
+  onDeckChange,
   timedSeconds,
   timedBest,
   onPlay,
@@ -27,6 +31,10 @@ export function SessionStart({
   profile: Profile | null;
   dueCount: number;
   sessionSize: number;
+  decks: Deck[];
+  /** Deck being studied; undefined = every card. */
+  deckId: DeckFilter;
+  onDeckChange: (deckId: DeckFilter) => void;
   /** Last chosen timed length (persisted by the caller). */
   timedSeconds: number;
   /** Best run so far, scored by pace so any duration is comparable. */
@@ -85,8 +93,19 @@ export function SessionStart({
         </div>
       ) : null}
 
+      {/* Which deck to study; nothing chosen means every card. */}
+      {decks.length > 0 && (
+        <div className="mt-auto">
+          <p className="px-1 pb-0.5 text-xs font-semibold text-oncanvas opacity-70">{t("deckStudy")}</p>
+          <DeckChips decks={decks} value={deckId} showAll onChange={onDeckChange} />
+          {deckId !== undefined && (
+            <p className="px-1 pt-0.5 text-[11px] text-oncanvas opacity-60">{t("deckHint")}</p>
+          )}
+        </div>
+      )}
+
       {/* Play */}
-      <div className="mt-auto flex flex-col gap-2">
+      <div className={`flex flex-col gap-2 ${decks.length > 0 ? "" : "mt-auto"}`}>
         {dueCount > 0 ? (
           <>
             <button

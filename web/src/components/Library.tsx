@@ -1,30 +1,61 @@
 import { useState } from "react";
 import { motion, useAnimation } from "framer-motion";
-import type { Card } from "../lib/api";
+import type { Card, Deck, DeckFilter } from "../lib/api";
 import { api } from "../lib/api";
 import { usePrefs } from "../lib/prefs";
 import { haptic } from "../lib/telegram";
+import { inDeck, withCounts, generalCount } from "../lib/decks";
 import { CardDetail } from "./CardDetail";
+import { DeckChips } from "./DeckChips";
 
 const DELETE_THRESHOLD = 90;
 
 export function Library({
   cards,
+  decks,
   learningLang,
   onCardUpdated,
   onCardDeleted,
+  onCreateDeck,
+  onRenameDeck,
+  onDeleteDeck,
 }: {
   cards: Card[];
+  decks: Deck[];
   learningLang: string;
   onCardUpdated: (card: Card) => void;
   onCardDeleted: (cardId: string) => void;
+  onCreateDeck: (name: string) => Promise<Deck>;
+  onRenameDeck: (id: string, name: string) => Promise<void>;
+  onDeleteDeck: (id: string) => Promise<void>;
 }) {
   const { t } = usePrefs();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectMode, setSelectMode] = useState(false);
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
+  // Which deck the list is filtered to: undefined = every card.
+  const [deckId, setDeckId] = useState<DeckFilter>(undefined);
+  // Deck being renamed/deleted after a long press, and the "new deck" prompt.
+  const [managed, setManaged] = useState<Deck | null>(null);
+  const [naming, setNaming] = useState(false);
   const selectedCard = cards.find((c) => c.id === selectedId) ?? null;
+  const shown = inDeck(cards, deckId);
+  const deckList = withCounts(decks, cards);
+
+  async function createDeck(name: string) {
+    const deck = await onCreateDeck(name);
+    setNaming(false);
+    setDeckId(deck.id);
+  }
+
+  async function removeDeck(id: string) {
+    await onDeleteDeck(id);
+    setManaged(null);
+    // Its cards are still there, under the general deck - land the user where
+    // they can see they survived.
+    if (deckId === id) setDeckId(undefined);
+  }
 
   async function deleteCard(id: string) {
     try {
@@ -57,7 +88,7 @@ export function Library({
     setChecked(new Set());
   }
 
-  if (cards.length === 0) {
+  if (cards.length === 0 && decks.length === 0) {
     return (
       <div className="flex h-full items-center justify-center text-center text-sm text-oncanvas opacity-70">
         {t("libEmpty")}
@@ -67,6 +98,17 @@ export function Library({
 
   return (
     <div className="flex h-full flex-col">
+      <DeckChips
+        decks={deckList}
+        generalCount={generalCount(cards, 0)}
+        value={deckId}
+        showAll
+        showCounts
+        onChange={setDeckId}
+        onAdd={() => setNaming(true)}
+        onManage={setManaged}
+      />
+
       <div className="flex items-center justify-between px-1 pb-2 text-oncanvas">
         <span className="text-xs opacity-70">
           {selectMode ? `${checked.size} ${t("selected")}` : t("swipeToDelete")}
@@ -109,7 +151,10 @@ export function Library({
             "linear-gradient(to bottom, transparent 0, #000 16px, #000 calc(100% - 16px), transparent 100%)",
         }}
       >
-        {cards.map((card) => (
+        {shown.length === 0 && (
+          <p className="py-10 text-center text-sm text-oncanvas opacity-70">{t("libEmpty")}</p>
+        )}
+        {shown.map((card) => (
           <LibraryRow
             key={card.id}
             card={card}
@@ -124,12 +169,147 @@ export function Library({
       {selectedCard && (
         <CardDetail
           card={selectedCard}
+          decks={decks}
           learningLang={learningLang}
           onClose={() => setSelectedId(null)}
           onUpdated={onCardUpdated}
           onDeleted={onCardDeleted}
         />
       )}
+
+      {naming && (
+        <DeckNamePrompt
+          title={t("deckNew")}
+          onSubmit={createDeck}
+          onCancel={() => setNaming(false)}
+        />
+      )}
+
+      {managed && !naming && (
+        <DeckManageSheet
+          deck={managed}
+          onRename={(name) => onRenameDeck(managed.id, name).then(() => setManaged(null))}
+          onDelete={() => removeDeck(managed.id)}
+          onCancel={() => setManaged(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// Name entry for creating or renaming a deck.
+function DeckNamePrompt({
+  title,
+  initial = "",
+  onSubmit,
+  onCancel,
+}: {
+  title: string;
+  initial?: string;
+  onSubmit: (name: string) => Promise<void>;
+  onCancel: () => void;
+}) {
+  const { t } = usePrefs();
+  const [name, setName] = useState(initial);
+  const [busy, setBusy] = useState(false);
+
+  async function submit() {
+    const trimmed = name.trim();
+    if (!trimmed || busy) return;
+    setBusy(true);
+    try {
+      await onSubmit(trimmed);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center">
+      <div className="w-full max-w-sm rounded-[18px] border-2 border-black bg-surface p-5 shadow-toon-lg">
+        <h3 className="mb-3 text-base font-bold text-ink">{title}</h3>
+        <input
+          autoFocus
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && submit()}
+          placeholder={t("deckName")}
+          maxLength={60}
+          className="w-full rounded-2xl border-2 border-black bg-white px-3 py-2 text-base text-ink outline-none placeholder:text-muted"
+        />
+        <button
+          type="button"
+          onClick={submit}
+          disabled={!name.trim() || busy}
+          className="mt-4 w-full rounded-2xl border-2 border-black bg-mint px-4 py-2.5 text-sm font-semibold text-ink shadow-toon-sm disabled:opacity-50"
+        >
+          {t("save")}
+        </button>
+        <button type="button" onClick={onCancel} className="mt-3 w-full text-center text-sm text-muted">
+          {t("cancel")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Rename or delete, reached by pressing and holding a deck chip.
+function DeckManageSheet({
+  deck,
+  onRename,
+  onDelete,
+  onCancel,
+}: {
+  deck: Deck;
+  onRename: (name: string) => Promise<void>;
+  onDelete: () => Promise<void>;
+  onCancel: () => void;
+}) {
+  const { t } = usePrefs();
+  const [renaming, setRenaming] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+
+  if (renaming) {
+    return <DeckNamePrompt title={t("deckRename")} initial={deck.name} onSubmit={onRename} onCancel={onCancel} />;
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center">
+      <div className="w-full max-w-sm rounded-[18px] border-2 border-black bg-surface p-5 shadow-toon-lg">
+        <h3 className="mb-3 text-base font-bold text-ink">{deck.name}</h3>
+        {confirming ? (
+          <>
+            <p className="mb-4 text-sm text-muted">{t("deckDeleteConfirm")}</p>
+            <button
+              type="button"
+              onClick={onDelete}
+              className="w-full rounded-2xl border-2 border-black bg-rose-400 px-4 py-2.5 text-sm font-semibold text-ink shadow-toon-sm"
+            >
+              {t("delete")}
+            </button>
+          </>
+        ) : (
+          <div className="flex flex-col gap-3">
+            <button
+              type="button"
+              onClick={() => setRenaming(true)}
+              className="w-full rounded-2xl border-2 border-black bg-white px-4 py-2.5 text-sm font-semibold text-ink shadow-toon-sm"
+            >
+              {t("deckRename")}
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirming(true)}
+              className="w-full rounded-2xl border-2 border-black bg-rose-400 px-4 py-2.5 text-sm font-semibold text-ink shadow-toon-sm"
+            >
+              {t("deckDelete")}
+            </button>
+          </div>
+        )}
+        <button type="button" onClick={onCancel} className="mt-3 w-full text-center text-sm text-muted">
+          {t("cancel")}
+        </button>
+      </div>
     </div>
   );
 }

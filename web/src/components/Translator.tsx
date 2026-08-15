@@ -3,6 +3,7 @@ import type { Card } from "../lib/api";
 import { api } from "../lib/api";
 import { usePrefs } from "../lib/prefs";
 import { languageName } from "../lib/i18n";
+import { deckArg } from "../lib/decks";
 
 // Google-Translate-style panel: one side is the language you're learning, the
 // other your own language; a single button swaps them. After translating, one
@@ -11,10 +12,13 @@ export function Translator({
   learningLang,
   nativeLang,
   onCardCreated,
+  askDeck,
 }: {
   learningLang: string;
   nativeLang: string;
   onCardCreated: (card: Card) => void;
+  /** Which deck to save into; resolves to null if the user backs out. */
+  askDeck: () => Promise<string | null>;
 }) {
   const { t } = usePrefs();
   // swapped=false: source = learning language, target = your language.
@@ -68,10 +72,12 @@ export function Translator({
 
   async function makeCard() {
     if (!learningText) return;
+    const deck = await askDeck();
+    if (deck === null) return;
     setCreating(true);
     setError(null);
     try {
-      const { card } = await api.createCard(learningText);
+      const { card } = await api.createCard(learningText, undefined, deckArg(deck));
       onCardCreated(card);
       setCreated(true);
     } catch {

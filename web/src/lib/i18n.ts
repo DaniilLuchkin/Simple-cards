@@ -193,6 +193,18 @@ const en = {
   unitDay: "d",
   unitMonth: "mo",
   unitYear: "y",
+  deckAll: "All cards",
+  deckGeneral: "General",
+  deckNew: "New deck",
+  deckName: "Deck name",
+  deckCreate: "Create",
+  deckRename: "Rename",
+  deckDelete: "Delete deck",
+  deckDeleteConfirm: "Delete this deck? Its cards move to General.",
+  deckManage: "Deck",
+  deckSaveTo: "Save to deck",
+  deckStudy: "Deck",
+  deckHint: "Grammar drills and the word of the day still use all your cards.",
 } as const;
 
 export type StringKey = keyof typeof en;
@@ -276,6 +288,12 @@ const ru: Dict = {
   srsCardAria: "Карточка, нажми, чтобы перевернуть",
   gradeAgain: "Снова", gradeHard: "Трудно", gradeGood: "Хорошо", gradeEasy: "Легко",
   unitLt10m: "<10 мин", unitDay: "д", unitMonth: "мес", unitYear: "г",
+  deckAll: "Все карточки", deckGeneral: "Общая", deckNew: "Новая колода",
+  deckName: "Название колоды", deckCreate: "Создать", deckRename: "Переименовать",
+  deckDelete: "Удалить колоду",
+  deckDeleteConfirm: "Удалить колоду? Её карточки переедут в «Общую».",
+  deckManage: "Колода", deckSaveTo: "В какую колоду сохранить?", deckStudy: "Колода",
+  deckHint: "Грамматика и слово дня по-прежнему берут все карточки.",
 };
 
 const uk: Dict = {

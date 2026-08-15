@@ -50,7 +50,24 @@ model User {
   streakFreezes Int @default(0)
 
   cards      Card[]
+  decks      Deck[]
   reviewDays ReviewDay[]
+}
+
+// A named group of cards. The "general" deck is not a row: cards with
+// deckId = null belong to it, so nothing has to be seeded per user and existing
+// cards need no backfill. It can't be renamed or deleted.
+model Deck {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name      String
+  createdAt DateTime @default(now())
+
+  cards Card[]
+
+  @@index([userId])
 }
 
 // One row per user per day they reviewed cards. `count` drives the streak
@@ -88,6 +105,11 @@ model Card {
   userId  String
   user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  // null = the general deck. SetNull on purpose: deleting a deck must return its
+  // cards to the general deck, never destroy them.
+  deckId String?
+  deck   Deck?   @relation(fields: [deckId], references: [id], onDelete: SetNull)
+
   // word == headword. example is the filled sentence (derived from `sentence`
   // when present) so the library preview stays readable.
   word        String
@@ -119,4 +141,5 @@ model Card {
   updatedAt DateTime @updatedAt
 
   @@index([userId, dueAt])
+  @@index([userId, deckId])
 }

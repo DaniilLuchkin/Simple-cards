@@ -116,6 +116,8 @@ export async function createCard(input: {
   word: string;
   userExample?: string;
   imagePath?: string;
+  /** Omitted by the bot, so its cards land in the general deck. */
+  deckId?: string;
 }) {
   const fields = await generateCard({
     word: input.word,
@@ -129,7 +131,12 @@ export async function createCard(input: {
   const imagePath = input.imagePath ?? (await imageForNewCard(fields));
 
   return prisma.card.create({
-    data: { userId: input.userId, ...cardColumns(fields), imageUrl: imagePath },
+    data: {
+      userId: input.userId,
+      ...cardColumns(fields),
+      imageUrl: imagePath,
+      deckId: input.deckId ?? null,
+    },
   });
 }
 
@@ -229,11 +236,17 @@ export async function generateCardSetPreview(input: {
 export async function saveGeneratedCards(input: {
   userId: string;
   cards: { fields: GeneratedCardFields; imagePath: string | null }[];
+  deckId?: string;
 }) {
   return Promise.all(
     input.cards.map((c) =>
       prisma.card.create({
-        data: { userId: input.userId, ...cardColumns(c.fields), imageUrl: c.imagePath },
+        data: {
+          userId: input.userId,
+          ...cardColumns(c.fields),
+          imageUrl: c.imagePath,
+          deckId: input.deckId ?? null,
+        },
       })
     )
   );
@@ -263,7 +276,11 @@ export async function listUserWords(userId: string, limit = 150): Promise<string
 }
 
 // Returns null when the photo isn't obvious enough to name confidently.
-export async function createCardFromImage(input: { userId: string; imagePath: string }) {
+export async function createCardFromImage(input: {
+  userId: string;
+  imagePath: string;
+  deckId?: string;
+}) {
   const fields = await generateCardFromImage(
     absoluteImageUrl(input.imagePath)!,
     await userLanguages(input.userId)
@@ -271,7 +288,12 @@ export async function createCardFromImage(input: { userId: string; imagePath: st
   if (!fields) return null;
 
   return prisma.card.create({
-    data: { userId: input.userId, ...cardColumns(fields), imageUrl: input.imagePath },
+    data: {
+      userId: input.userId,
+      ...cardColumns(fields),
+      imageUrl: input.imagePath,
+      deckId: input.deckId ?? null,
+    },
   });
 }
 

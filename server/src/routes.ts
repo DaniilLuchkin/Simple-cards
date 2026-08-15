@@ -66,6 +66,81 @@ meRouter.get("/league", async (req, res) => {
   res.json({ entries: await getLeague(req.dbUserId!) });
 });
 
+// ---------- Decks ----------
+// The "general" deck is not a row: cards with deckId = null belong to it, so it
+// can't be renamed or deleted and needs no seeding.
+export const decksRouter = Router();
+
+const deckNameSchema = z.object({ name: z.string().trim().min(1).max(60) });
+
+decksRouter.get("/", async (req, res) => {
+  const userId = req.dbUserId!;
+  const [decks, counts] = await Promise.all([
+    prisma.deck.findMany({ where: { userId }, orderBy: { createdAt: "asc" } }),
+    prisma.card.groupBy({
+      by: ["deckId"],
+      where: { userId, status: "ACTIVE" },
+      _count: { _all: true },
+    }),
+  ]);
+
+  const byDeck = new Map(counts.map((c) => [c.deckId, c._count._all]));
+  res.json({
+    decks: decks.map((d) => ({ id: d.id, name: d.name, cardCount: byDeck.get(d.id) ?? 0 })),
+    // Cards that belong to no deck, shown as the built-in "general" deck.
+    generalCount: byDeck.get(null) ?? 0,
+  });
+});
+
+decksRouter.post("/", async (req, res) => {
+  const parsed = deckNameSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten() });
+    return;
+  }
+  const deck = await prisma.deck.create({
+    data: { userId: req.dbUserId!, name: parsed.data.name },
+  });
+  res.status(201).json({ deck: { id: deck.id, name: deck.name, cardCount: 0 } });
+});
+
+decksRouter.patch("/:id", async (req, res) => {
+  const parsed = deckNameSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten() });
+    return;
+  }
+  const { count } = await prisma.deck.updateMany({
+    where: { id: req.params.id, userId: req.dbUserId! },
+    data: { name: parsed.data.name },
+  });
+  if (!count) {
+    res.status(404).json({ error: "Deck not found" });
+    return;
+  }
+  res.json({ ok: true });
+});
+
+// The cards survive: Card.deckId is SET NULL, which returns them to the general
+// deck rather than deleting them.
+decksRouter.delete("/:id", async (req, res) => {
+  const { count } = await prisma.deck.deleteMany({
+    where: { id: req.params.id, userId: req.dbUserId! },
+  });
+  if (!count) {
+    res.status(404).json({ error: "Deck not found" });
+    return;
+  }
+  res.status(204).end();
+});
+
+// Guards against filing a card into someone else's deck (or a deleted one).
+async function ownedDeckId(userId: string, deckId?: string | null): Promise<string | undefined> {
+  if (!deckId) return undefined;
+  const deck = await prisma.deck.findFirst({ where: { id: deckId, userId }, select: { id: true } });
+  return deck?.id;
+}
+
 // A batch of grammar drills built from the learner's own words. Nothing is
 // stored: they're generated fresh each run.
 export const grammarRouter = Router();
@@ -140,9 +215,24 @@ function toApiCard(card: Card) {
 }
 
 // All cards due for review right now, oldest due date first.
+/**
+ * Turns a `deckId` query value into a Prisma filter fragment:
+ * absent -> every deck (unchanged behaviour), "none" -> the general deck
+ * (deckId null), any other value -> that deck.
+ */
+export function deckFilter(deckId: unknown): { deckId?: string | null } {
+  if (typeof deckId !== "string" || deckId === "") return {};
+  return { deckId: deckId === "none" ? null : deckId };
+}
+
 cardsRouter.get("/due", async (req, res) => {
   const cards = await prisma.card.findMany({
-    where: { userId: req.dbUserId!, status: "ACTIVE", dueAt: { lte: new Date() } },
+    where: {
+      userId: req.dbUserId!,
+      status: "ACTIVE",
+      dueAt: { lte: new Date() },
+      ...deckFilter(req.query.deckId),
+    },
     orderBy: { dueAt: "asc" },
   });
   res.json({ cards: cards.map(toApiCard) });
@@ -151,7 +241,7 @@ cardsRouter.get("/due", async (req, res) => {
 // Full library, for the "my cards" management view.
 cardsRouter.get("/", async (req, res) => {
   const cards = await prisma.card.findMany({
-    where: { userId: req.dbUserId!, status: "ACTIVE" },
+    where: { userId: req.dbUserId!, status: "ACTIVE", ...deckFilter(req.query.deckId) },
     orderBy: { createdAt: "desc" },
   });
   res.json({ cards: cards.map(toApiCard) });
@@ -308,6 +398,7 @@ cardsRouter.post("/:id/regenerate", async (req, res) => {
 const createSchema = z.object({
   word: z.string().min(1).max(200),
   example: z.string().max(500).optional(),
+  deckId: z.string().max(64).optional(),
 });
 
 cardsRouter.post("/", async (req, res) => {
@@ -321,6 +412,7 @@ cardsRouter.post("/", async (req, res) => {
       userId: req.dbUserId!,
       word: parsed.data.word,
       userExample: parsed.data.example,
+      deckId: await ownedDeckId(req.dbUserId!, parsed.data.deckId),
     });
     res.status(201).json({ card: toApiCard(card) });
   } catch (err) {
@@ -389,6 +481,7 @@ const saveSetSchema = z.object({
     )
     .min(1)
     .max(30),
+  deckId: z.string().max(64).optional(),
 });
 
 // Turns the absolute image URL we handed the client back into the relative path
@@ -412,6 +505,7 @@ cardsRouter.post("/generate-set/save", async (req, res) => {
   try {
     const cards = await saveGeneratedCards({
       userId: req.dbUserId!,
+      deckId: await ownedDeckId(req.dbUserId!, parsed.data.deckId),
       cards: parsed.data.cards.map((c) => ({
         fields: c.fields as GeneratedCardFields,
         imagePath: imagePathFromUrl(c.imageUrl),
@@ -437,7 +531,12 @@ cardsRouter.post(
     }
     try {
       const imagePath = await saveImage(body, req.get("content-type") ?? "image/jpeg");
-      const card = await createCardFromImage({ userId: req.dbUserId!, imagePath });
+      // The body is the image itself, so the deck rides along as a query param.
+      const deckId = await ownedDeckId(
+        req.dbUserId!,
+        typeof req.query.deckId === "string" ? req.query.deckId : undefined
+      );
+      const card = await createCardFromImage({ userId: req.dbUserId!, imagePath, deckId });
       if (!card) {
         res.status(422).json({ error: "Could not recognize the photo" });
         return;
@@ -464,6 +563,8 @@ const updateSchema = z
     collocations: z.array(z.string().max(200)).max(20),
     // The user's editable association from the SRS card back.
     personalNote: z.string().max(1000),
+    // Moving a card between decks; null returns it to the general deck.
+    deckId: z.string().max(64).nullable(),
   })
   .partial()
   .refine((data) => Object.keys(data).length > 0, { message: "No fields to update" });
@@ -483,9 +584,16 @@ cardsRouter.patch("/:id", async (req, res) => {
     return;
   }
 
+  // A deck the caller doesn't own is treated as "no deck" rather than trusted.
+  const { deckId, ...fields } = parsed.data;
   const updated = await prisma.card.update({
     where: { id: card.id },
-    data: parsed.data,
+    data: {
+      ...fields,
+      ...(deckId === undefined
+        ? {}
+        : { deckId: deckId === null ? null : ((await ownedDeckId(req.dbUserId!, deckId)) ?? null) }),
+    },
   });
 
   res.json({ card: toApiCard(updated) });
