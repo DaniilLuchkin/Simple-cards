@@ -21,6 +21,7 @@ export function SessionStart({
   timedBest,
   onPlay,
   onPlayTimed,
+  onGrammar,
   onPractice,
 }: {
   profile: Profile | null;
@@ -32,6 +33,7 @@ export function SessionStart({
   timedBest: TimedBest | null;
   onPlay: () => void;
   onPlayTimed: (seconds: number) => void;
+  onGrammar: () => void;
   onPractice: () => void;
 }) {
   const { t } = usePrefs();
@@ -151,6 +153,13 @@ export function SessionStart({
             <p className="mt-1 text-sm text-muted">{t("emptyHint")}</p>
           </div>
         )}
+        <button
+          type="button"
+          onClick={onGrammar}
+          className="rounded-2xl border-2 border-black bg-blush px-4 py-2.5 text-sm font-bold text-ink shadow-toon-sm"
+        >
+          📝 {t("grammar")}
+        </button>
         <button
           type="button"
           onClick={onPractice}

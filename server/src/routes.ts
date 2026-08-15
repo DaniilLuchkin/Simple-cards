@@ -10,6 +10,7 @@ import {
   completeSession,
   generateCardImageFile,
   generateCardSetPreview,
+  generateGrammarExercises,
   saveGeneratedCards,
   getProfile,
   recordReview,
@@ -63,6 +64,24 @@ meRouter.get("/", async (req, res) => {
 // Weekly leaderboard across the user's referral circle.
 meRouter.get("/league", async (req, res) => {
   res.json({ entries: await getLeague(req.dbUserId!) });
+});
+
+// A batch of grammar drills built from the learner's own words. Nothing is
+// stored: they're generated fresh each run.
+export const grammarRouter = Router();
+
+grammarRouter.post("/", async (req, res) => {
+  try {
+    const exercises = await generateGrammarExercises(req.dbUserId!);
+    if (!exercises.length) {
+      res.status(502).json({ error: "No exercises generated" });
+      return;
+    }
+    res.json({ exercises });
+  } catch (err) {
+    console.error("Failed to generate grammar exercises", err);
+    res.status(502).json({ error: "Failed to generate exercises" });
+  }
 });
 
 const profileSchema = z

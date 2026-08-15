@@ -5,6 +5,7 @@ import {
   generateCard,
   generateCardFromImage,
   generateCardSet,
+  generateGrammarSet,
   generateImage,
   regenerateCard,
 } from "./llm.js";
@@ -236,6 +237,18 @@ export async function saveGeneratedCards(input: {
       })
     )
   );
+}
+
+// Grammar practice built from the learner's own vocabulary, aimed at their CEFR
+// band. Nothing is persisted - these are bonus drills, deliberately kept out of
+// the daily count and streak, which measure card reviews.
+export async function generateGrammarExercises(userId: string, count = 8) {
+  const [languages, levels, words] = await Promise.all([
+    userLanguages(userId),
+    userLevels(userId),
+    listUserWords(userId, 60),
+  ]);
+  return generateGrammarSet(languages, levels, words, count);
 }
 
 // Recent vocabulary, used to keep the word of the day from repeating cards.

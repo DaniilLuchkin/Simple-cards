@@ -214,6 +214,124 @@ export async function generateCardSet(
     .slice(0, max);
 }
 
+// ---------- Grammar exercises ----------
+
+export type GrammarExercise =
+  | {
+      type: "gap";
+      /** Contains the {{gap}} token in place of the missing word. */
+      sentence: string;
+      options: string[];
+      answer: string;
+      explanation: string;
+    }
+  | {
+      type: "order";
+      /** Shuffled tokens of `answer` - always derived server-side. */
+      words: string[];
+      answer: string;
+      explanation: string;
+    };
+
+function grammarPrompt(langs: Languages, levels: Levels, count: number): string {
+  return `You are a grammar-exercise writer for "Simple Cards", an app for learning ${langs.learning}.
+
+Produce ${count} short exercises, MIXING these two types roughly evenly:
+- {"type":"gap", "sentence": a natural ${langs.learning} sentence with ONE word replaced by the literal token ${GAP}, "answer": the word that belongs in the gap, "options": 4 plausible choices INCLUDING the answer (the wrong ones must be grammatically tempting, e.g. a wrong tense/article/preposition), "explanation": one short line in ${langs.translation} saying WHY the answer is right}
+- {"type":"order", "answer": one natural ${langs.learning} sentence of 4-9 words, "explanation": one short line in ${langs.translation} about the word order rule it shows}
+
+Each exercise must test a GRAMMAR point (tense, article, preposition, agreement, word order), not just vocabulary.${levelGuidance(levels)}
+
+Where it fits naturally, build sentences around the learner's own words listed by the user - but never force a word in.
+
+Respond ONLY with the JSON object: {"exercises": [...]}`;
+}
+
+// Fisher-Yates; the model's own ordering is never trusted.
+function shuffled<T>(items: T[]): T[] {
+  const out = [...items];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
+const strings = (v: unknown): string[] =>
+  Array.isArray(v) ? v.filter((x): x is string => typeof x === "string").map((x) => x.trim()).filter(Boolean) : [];
+
+/** Whitespace-normalised word tokens of a sentence. */
+export function sentenceTokens(sentence: string): string[] {
+  return sentence.trim().split(/\s+/).filter(Boolean);
+}
+
+// Turns one raw LLM item into a usable exercise, or null when it's malformed.
+// Everything the UI relies on is rebuilt here rather than taken on trust.
+function coerceExercise(raw: unknown): GrammarExercise | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const explanation = typeof o.explanation === "string" ? o.explanation.trim() : "";
+  const answer = typeof o.answer === "string" ? o.answer.trim() : "";
+  if (!answer) return null;
+
+  if (o.type === "gap") {
+    const sentence = typeof o.sentence === "string" ? o.sentence.trim() : "";
+    if (!sentence.includes(GAP)) return null;
+
+    // De-dupe, guarantee the answer is present, and shuffle so its position
+    // carries no information.
+    const options = [...new Set([answer, ...strings(o.options)])];
+    if (options.length < 2) return null;
+
+    return { type: "gap", sentence, options: shuffled(options.slice(0, 4)), answer, explanation };
+  }
+
+  if (o.type === "order") {
+    // Tokens come from the answer itself: a model-supplied word list routinely
+    // disagrees with its own sentence, which would make the exercise unsolvable.
+    const tokens = sentenceTokens(answer);
+    if (tokens.length < 3) return null;
+
+    return { type: "order", words: shuffled(tokens), answer, explanation };
+  }
+
+  return null;
+}
+
+export async function generateGrammarSet(
+  languages: Languages,
+  levels: Levels,
+  words: string[],
+  count: number
+): Promise<GrammarExercise[]> {
+  const content = await chatCompletion(
+    [
+      { role: "system", content: grammarPrompt(languages, levels, count) },
+      {
+        role: "user",
+        content: words.length
+          ? `The learner's words: ${words.slice(0, 60).join(", ")}`
+          : "The learner has no cards yet - use common everyday vocabulary.",
+      },
+    ],
+    { temperature: 0.8 }
+  );
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    throw new Error(`LLM did not return valid JSON: ${content}`);
+  }
+  const rawList = (parsed as { exercises?: unknown }).exercises;
+  if (!Array.isArray(rawList)) throw new Error(`LLM response had no exercises array: ${content}`);
+
+  return rawList
+    .map(coerceExercise)
+    .filter((e): e is GrammarExercise => e !== null)
+    .slice(0, count);
+}
+
 export async function regenerateCard(input: {
   headword: string;
   previous: GeneratedCardFields;

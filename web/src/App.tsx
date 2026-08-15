@@ -1,6 +1,13 @@
 import { useEffect, useState } from "react";
 import { api } from "./lib/api";
-import type { Card, Grade, Profile as ProfileData, ProfileUpdate, Sm2Snapshot } from "./lib/api";
+import type {
+  Card,
+  Grade,
+  GrammarExercise,
+  Profile as ProfileData,
+  ProfileUpdate,
+  Sm2Snapshot,
+} from "./lib/api";
 import { usePrefs } from "./lib/prefs";
 import { ReviewDeck } from "./components/ReviewDeck";
 import { Library } from "./components/Library";
@@ -12,6 +19,7 @@ import { Translator } from "./components/Translator";
 import { AiGenerate } from "./components/AiGenerate";
 import { SessionStart } from "./components/SessionStart";
 import { SessionSummary } from "./components/SessionSummary";
+import { GrammarSession } from "./components/GrammarSession";
 import { isFasterThan } from "./lib/format";
 import type { TimedBest } from "./lib/format";
 import { haptic } from "./lib/telegram";
@@ -107,6 +115,9 @@ export function App() {
   // Review is played in rounds: lobby -> playing -> summary.
   const [session, setSession] = useState<SessionState | null>(null);
   const [summary, setSummary] = useState<SessionResult | null>(null);
+  // Grammar drills: "loading" while the batch is generated, then the exercises.
+  const [grammar, setGrammar] = useState<GrammarExercise[] | "loading" | null>(null);
+  const [grammarFailed, setGrammarFailed] = useState(false);
   const [timedSeconds, setTimedSeconds] = useState(readTimedSeconds);
   const [timedBest, setTimedBest] = useState<TimedBest | null>(readTimedBest);
   // Ticks only while a timed round is live, to drive the countdown.
@@ -205,6 +216,20 @@ export function App() {
     const over =
       next.mode === "timed" ? deckEmpty : next.done >= next.size || deckEmpty;
     if (over) await finishSession(next);
+  }
+
+  // Grammar is bonus practice: it deliberately records nothing server-side.
+  async function startGrammar() {
+    setGrammar("loading");
+    setGrammarFailed(false);
+    try {
+      const { exercises } = await api.getGrammarSet();
+      setGrammar(exercises);
+    } catch (err) {
+      console.error("Failed to load grammar exercises", err);
+      setGrammar(null);
+      setGrammarFailed(true);
+    }
   }
 
   function startSession(mode: SessionMode = "normal", seconds = timedSeconds) {
@@ -360,6 +385,14 @@ export function App() {
         {!error && tab === "review" && (
           reviewCards === null ? (
             <p className="p-8 text-center text-sm text-oncanvas opacity-70">{t("loading")}</p>
+          ) : grammar === "loading" ? (
+            <p className="p-8 text-center text-sm text-oncanvas opacity-70">{t("grammarLoading")}</p>
+          ) : grammar ? (
+            <GrammarSession
+              exercises={grammar}
+              onRestart={startGrammar}
+              onDone={() => setGrammar(null)}
+            />
           ) : summary ? (
             <SessionSummary
               reviewed={summary.reviewed}
@@ -395,6 +428,12 @@ export function App() {
               onCardDeleted={handleCardDeleted}
             />
           ) : (
+            <>
+              {grammarFailed && (
+                <p className="pb-2 text-center text-sm font-semibold text-red-500">
+                  {t("grammarFailed")}
+                </p>
+              )}
             <SessionStart
               profile={profile}
               dueCount={dueCards?.length ?? 0}
@@ -403,8 +442,10 @@ export function App() {
               timedBest={timedBest}
               onPlay={() => startSession("normal")}
               onPlayTimed={(seconds) => startSession("timed", seconds)}
+              onGrammar={startGrammar}
               onPractice={startPractice}
             />
+            </>
           )
         )}
 

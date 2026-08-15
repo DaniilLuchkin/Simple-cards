@@ -78,6 +78,25 @@ export type Quest = {
   done: boolean;
 };
 
+// A grammar drill. Generated fresh each run and never stored, so it carries no
+// id: the client holds the batch for the length of the round.
+export type GrammarExercise =
+  | {
+      type: "gap";
+      /** Contains the {{gap}} token where the missing word goes. */
+      sentence: string;
+      options: string[];
+      answer: string;
+      explanation: string;
+    }
+  | {
+      type: "order";
+      /** Shuffled tokens of `answer`. */
+      words: string[];
+      answer: string;
+      explanation: string;
+    };
+
 // One row of the weekly friends leaderboard.
 export type LeagueEntry = {
   name: string;
@@ -257,6 +276,9 @@ export const api = {
     }),
   getProfile: () => request<{ profile: Profile }>("/api/me"),
   getLeague: () => request<{ entries: LeagueEntry[] }>("/api/me/league"),
+  // A fresh batch of grammar drills built from the learner's own words.
+  getGrammarSet: () =>
+    request<{ exercises: GrammarExercise[] }>("/api/grammar", { method: "POST" }),
   // Finish a review round; returns the refreshed profile (streak, quests…).
   completeSession: (bestCombo: number) =>
     request<{ profile: Profile }>("/api/me/session", {
