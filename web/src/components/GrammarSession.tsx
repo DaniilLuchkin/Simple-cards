@@ -1,8 +1,95 @@
-import { useState } from "react";
-import type { GrammarExercise } from "../lib/api";
+import { useRef, useState } from "react";
+import type { Card, GrammarExercise } from "../lib/api";
 import { usePrefs } from "../lib/prefs";
 import { splitCloze } from "../lib/srsCard";
 import { haptic } from "../lib/telegram";
+import { useLongPress } from "../lib/useLongPress";
+import { normalizeToken } from "../lib/wordIndex";
+
+// Words the learner already has a card for are marked in exercise sentences and
+// open that card. Purely lexical, so it never leaks a grammar answer.
+const HIGHLIGHT =
+  "rounded bg-sky px-0.5 underline decoration-black/40 decoration-dotted underline-offset-2";
+
+function HighlightedText({
+  text,
+  index,
+  onPick,
+}: {
+  text: string;
+  index: Map<string, Card>;
+  onPick: (card: Card) => void;
+}) {
+  // Split on whitespace but keep it, so the sentence spacing is preserved.
+  return (
+    <>
+      {text.split(/(\s+)/).map((chunk, i) => {
+        const card = /\s/.test(chunk) ? undefined : index.get(normalizeToken(chunk));
+        if (!card) return <span key={i}>{chunk}</span>;
+        return (
+          <button
+            key={i}
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onPick(card);
+            }}
+            className={HIGHLIGHT}
+          >
+            {chunk}
+          </button>
+        );
+      })}
+    </>
+  );
+}
+
+// A draggable-free word chip. Tap does the exercise's job (place / take back);
+// press-and-hold opens the card, when the word is one of the learner's.
+function WordChip({
+  word,
+  card,
+  onTap,
+  onPick,
+  disabled,
+  placed,
+}: {
+  word: string;
+  card?: Card;
+  onTap: () => void;
+  onPick: (card: Card) => void;
+  disabled: boolean;
+  placed?: boolean;
+}) {
+  // A completed hold is followed by a click; swallow it so one gesture doesn't
+  // both open the card and move the word.
+  const suppressClick = useRef(false);
+  const hold = useLongPress(() => {
+    if (!card) return;
+    suppressClick.current = true;
+    onPick(card);
+  });
+
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={() => {
+        if (suppressClick.current) {
+          suppressClick.current = false;
+          return;
+        }
+        onTap();
+      }}
+      {...(card ? hold : {})}
+      className={`rounded-lg border-2 border-black px-3 py-1.5 font-serif text-base text-ink shadow-toon-sm ${
+        placed ? "bg-sky" : "bg-white"
+      } ${card ? "underline decoration-black/40 decoration-dotted underline-offset-2" : ""}`}
+    >
+      {word}
+    </button>
+  );
+}
 
 /** Whitespace-normalised tokens, mirroring the server's sentenceTokens. */
 function tokens(sentence: string): string[] {
@@ -13,10 +100,15 @@ function tokens(sentence: string): string[] {
 // Nothing here touches the SRS schedule - these are bonus practice.
 export function GrammarSession({
   exercises,
+  wordIndex,
+  onPickWord,
   onRestart,
   onDone,
 }: {
   exercises: GrammarExercise[];
+  /** Every form of the learner's vocabulary -> its card. */
+  wordIndex: Map<string, Card>;
+  onPickWord: (card: Card) => void;
   onRestart: () => void;
   onDone: () => void;
 }) {
@@ -111,11 +203,19 @@ export function GrammarSession({
         {ex.type === "gap" ? (
           <>
             <p className="font-serif text-xl leading-relaxed text-ink">
-              {splitCloze(ex.sentence).before}
+              <HighlightedText
+                text={splitCloze(ex.sentence).before}
+                index={wordIndex}
+                onPick={onPickWord}
+              />
               <span className="mx-0.5 inline-flex min-w-[4rem] items-center justify-center rounded-md border-2 border-black bg-gap px-2 align-baseline">
                 {result === null ? "…" : ex.answer}
               </span>
-              {splitCloze(ex.sentence).after}
+              <HighlightedText
+                text={splitCloze(ex.sentence).after}
+                index={wordIndex}
+                onPick={onPickWord}
+              />
             </p>
 
             <div className="flex flex-col gap-2">
@@ -152,15 +252,15 @@ export function GrammarSession({
             {/* The answer line being assembled */}
             <div className="flex min-h-[3.5rem] flex-wrap content-start gap-2 rounded-xl border-2 border-dashed border-black p-2">
               {placedWords.map((w, slot) => (
-                <button
+                <WordChip
                   key={`${w}-${slot}`}
-                  type="button"
+                  word={w}
+                  card={wordIndex.get(normalizeToken(w))}
+                  placed
                   disabled={result !== null}
-                  onClick={() => setPlaced((p) => p.filter((_, i) => i !== slot))}
-                  className="rounded-lg border-2 border-black bg-sky px-3 py-1.5 font-serif text-base text-ink shadow-toon-sm"
-                >
-                  {w}
-                </button>
+                  onTap={() => setPlaced((p) => p.filter((_, i) => i !== slot))}
+                  onPick={onPickWord}
+                />
               ))}
             </div>
 
@@ -168,15 +268,14 @@ export function GrammarSession({
             <div className="flex flex-wrap gap-2">
               {ex.words.map((w, i) =>
                 placed.includes(i) ? null : (
-                  <button
+                  <WordChip
                     key={`${w}-${i}`}
-                    type="button"
+                    word={w}
+                    card={wordIndex.get(normalizeToken(w))}
                     disabled={result !== null}
-                    onClick={() => setPlaced((p) => [...p, i])}
-                    className="rounded-lg border-2 border-black bg-white px-3 py-1.5 font-serif text-base text-ink shadow-toon-sm"
-                  >
-                    {w}
-                  </button>
+                    onTap={() => setPlaced((p) => [...p, i])}
+                    onPick={onPickWord}
+                  />
                 )
               )}
             </div>
@@ -204,7 +303,9 @@ export function GrammarSession({
               {result ? `✅ ${t("answerRight")}` : `❌ ${t("answerWrong")}`}
             </p>
             {!result && ex.type === "order" && (
-              <p className="font-serif text-base text-ink">{ex.answer}</p>
+              <p className="font-serif text-base text-ink">
+                <HighlightedText text={ex.answer} index={wordIndex} onPick={onPickWord} />
+              </p>
             )}
             {ex.explanation && <p className="text-sm text-muted">{ex.explanation}</p>}
           </div>

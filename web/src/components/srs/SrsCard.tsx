@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent, MouseEvent, PointerEvent, ReactNode } from "react";
 import { usePrefs } from "../../lib/prefs";
 import { speak } from "../../lib/speak";
-import { haptic } from "../../lib/telegram";
+import { useLongPress } from "../../lib/useLongPress";
 import { GRADES, formatInterval, previewIntervals, schedule } from "../../lib/srs";
 import type { Grade, SrsState } from "../../lib/srs";
 import { splitCloze, wordSkeleton } from "../../lib/srsCard";
@@ -49,31 +49,6 @@ function usePrefersReducedMotion(): boolean {
   return reduced;
 }
 
-// Deliberate press-and-hold (500ms + haptic). Returns handlers to spread on the
-// target so a stray tap never triggers it.
-function useLongPress(onTrigger: () => void) {
-  const timer = useRef<number | null>(null);
-  const clear = () => {
-    if (timer.current !== null) {
-      clearTimeout(timer.current);
-      timer.current = null;
-    }
-  };
-  return {
-    onPointerDown: () => {
-      clear();
-      timer.current = window.setTimeout(() => {
-        timer.current = null;
-        haptic("medium");
-        onTrigger();
-      }, 500);
-    },
-    onPointerUp: clear,
-    onPointerLeave: clear,
-    onPointerCancel: clear,
-    onContextMenu: (e: MouseEvent) => e.preventDefault(),
-  };
-}
 
 // "ПЕРЕВЕРНУТЬ ⟳" control shared by both faces.
 function FlipLink({ label, onFlip }: { label: string; onFlip: () => void }) {
@@ -95,6 +70,7 @@ export function SrsCard({
   card,
   learningLang = "en-US",
   defaultFlipped = false,
+  readOnly = false,
   onGrade,
   onEdit,
   onUploadImage,
@@ -103,6 +79,8 @@ export function SrsCard({
   card: SrsCardData;
   learningLang?: string;
   defaultFlipped?: boolean;
+  /** Peek mode: no grading and no press-and-hold editing. Flipping still works. */
+  readOnly?: boolean;
   onGrade?: (grade: Grade, next: SrsState) => void;
   onEdit?: (patch: Partial<Card>) => void;
   onUploadImage?: (file: File) => void;
@@ -176,7 +154,9 @@ export function SrsCard({
   const faceBase =
     "absolute inset-0 flex flex-col gap-4 overflow-y-auto rounded-[18px] border-2 border-black bg-surface p-6 [backface-visibility:hidden]";
 
-  const gradeRow = () => (
+  // Nothing to grade while peeking at a card mid-exercise.
+  const gradeRow = () =>
+    readOnly ? null : (
     <div className="grid grid-cols-4 gap-2 pt-1">
       {GRADES.map((g) => (
         <button
@@ -198,9 +178,11 @@ export function SrsCard({
         <span className={sectionLabel}>{label}</span>
         <FlipLink label={t("srsFlip")} onFlip={toggleFlip} />
       </div>
-      <p className="flex items-center gap-1 text-[11px] text-muted">
-        <span aria-hidden>✏️</span> {t("srsEditHint")}
-      </p>
+      {!readOnly && (
+        <p className="flex items-center gap-1 text-[11px] text-muted">
+          <span aria-hidden>✏️</span> {t("srsEditHint")}
+        </p>
+      )}
     </div>
   );
 
@@ -216,11 +198,7 @@ export function SrsCard({
         }
         toggleFlip();
       }}
-      onPointerDown={editHold.onPointerDown}
-      onPointerUp={editHold.onPointerUp}
-      onPointerLeave={editHold.onPointerLeave}
-      onPointerCancel={editHold.onPointerCancel}
-      onContextMenu={editHold.onContextMenu}
+      {...(readOnly ? {} : editHold)}
       onKeyDown={onCardKeyDown}
       className="mx-auto h-full min-h-[520px] w-full max-w-sm cursor-pointer select-none outline-none [perspective:1200px]"
     >

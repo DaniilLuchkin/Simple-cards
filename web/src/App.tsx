@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "./lib/api";
 import type {
   Card,
@@ -20,6 +20,8 @@ import { AiGenerate } from "./components/AiGenerate";
 import { SessionStart } from "./components/SessionStart";
 import { SessionSummary } from "./components/SessionSummary";
 import { GrammarSession } from "./components/GrammarSession";
+import { CardPeek } from "./components/CardPeek";
+import { buildWordIndex } from "./lib/wordIndex";
 import { isFasterThan } from "./lib/format";
 import type { TimedBest } from "./lib/format";
 import { haptic } from "./lib/telegram";
@@ -118,6 +120,8 @@ export function App() {
   // Grammar drills: "loading" while the batch is generated, then the exercises.
   const [grammar, setGrammar] = useState<GrammarExercise[] | "loading" | null>(null);
   const [grammarFailed, setGrammarFailed] = useState(false);
+  // A word tapped inside an exercise, shown as a read-only card.
+  const [peekCard, setPeekCard] = useState<Card | null>(null);
   const [timedSeconds, setTimedSeconds] = useState(readTimedSeconds);
   const [timedBest, setTimedBest] = useState<TimedBest | null>(readTimedBest);
   // Ticks only while a timed round is live, to drive the countdown.
@@ -223,7 +227,14 @@ export function App() {
     setGrammar("loading");
     setGrammarFailed(false);
     try {
-      const { exercises } = await api.getGrammarSet();
+      // The exercises highlight the learner's own words, so the deck has to be
+      // loaded too - it otherwise only arrives when the Library tab opens.
+      const [{ exercises }] = await Promise.all([
+        api.getGrammarSet(),
+        allCards === null
+          ? api.getAllCards().then((res) => setAllCards(res.cards)).catch(() => {})
+          : Promise.resolve(),
+      ]);
       setGrammar(exercises);
     } catch (err) {
       console.error("Failed to load grammar exercises", err);
@@ -364,6 +375,7 @@ export function App() {
 
   const practice = practiceCards !== null;
   const reviewCards = practiceCards ?? dueCards;
+  const wordIndex = useMemo(() => buildWordIndex(allCards ?? []), [allCards]);
 
   return (
     <div className="mx-auto flex h-[100dvh] max-w-md flex-col overflow-hidden px-4 pt-[max(env(safe-area-inset-top),0.5rem)]">
@@ -390,6 +402,8 @@ export function App() {
           ) : grammar ? (
             <GrammarSession
               exercises={grammar}
+              wordIndex={wordIndex}
+              onPickWord={setPeekCard}
               onRestart={startGrammar}
               onDone={() => setGrammar(null)}
             />
@@ -470,6 +484,14 @@ export function App() {
           )
         )}
       </main>
+
+      {peekCard && (
+        <CardPeek
+          card={peekCard}
+          learningLang={profile?.learningLanguage ?? "en"}
+          onClose={() => setPeekCard(null)}
+        />
+      )}
     </div>
   );
 }
