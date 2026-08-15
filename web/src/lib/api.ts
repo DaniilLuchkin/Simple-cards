@@ -214,6 +214,12 @@ export const api = {
       body: JSON.stringify(snapshot),
     }),
   deleteCard: (id: string) => request<void>(`/api/cards/${id}`, { method: "DELETE" }),
+  // File a batch of existing cards into a deck at once; null = the general deck.
+  moveCards: (cardIds: string[], deckId: string | null) =>
+    request<{ count: number }>("/api/cards/move", {
+      method: "POST",
+      body: JSON.stringify({ cardIds, deckId }),
+    }),
   // Comment is optional - with none, the server regenerates a fresh alternative.
   regenerateCard: (id: string, comment?: string) =>
     request<{ card: Card }>(`/api/cards/${id}/regenerate`, {

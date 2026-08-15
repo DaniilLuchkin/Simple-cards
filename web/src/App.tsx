@@ -409,6 +409,22 @@ export function App() {
     }
   }
 
+  // Sorting an existing pile: file a batch of cards into a deck at once.
+  async function handleMoveCards(cardIds: string[], deckId: string | null) {
+    await api.moveCards(cardIds, deckId);
+    const ids = new Set(cardIds);
+    const applyMove = (cards: Card[] | null) =>
+      cards?.map((c) => (ids.has(c.id) ? { ...c, deckId } : c)) ?? cards;
+    setAllCards(applyMove);
+    setPracticeCards(applyMove);
+    // Cards can move into or out of the deck being studied, so let the server
+    // say what's due now rather than patching the queue by hand.
+    api
+      .getDueCards(studyDeck)
+      .then((res) => setDueCards(res.cards))
+      .catch((err) => console.error("Failed to refresh due cards", err));
+  }
+
   // Capture a photo -> generate a new card -> put it at the front of the review
   // deck and switch to the Review tab so the user sees it right away.
   async function handleCaptureCard(file: File) {
@@ -576,6 +592,7 @@ export function App() {
               onCreateDeck={handleCreateDeck}
               onRenameDeck={handleRenameDeck}
               onDeleteDeck={handleDeleteDeck}
+              onMoveCards={handleMoveCards}
             />
           )
         )}

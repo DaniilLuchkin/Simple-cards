@@ -203,6 +203,8 @@ const en = {
   deckDeleteConfirm: "Delete this deck? Its cards move to General.",
   deckManage: "Deck",
   deckSaveTo: "Save to deck",
+  moveToDeck: "To deck",
+  moveToDeckTitle: "Move to deck",
   deckStudy: "Deck",
   deckHint: "Grammar drills and the word of the day still use all your cards.",
 } as const;
@@ -293,6 +295,7 @@ const ru: Dict = {
   deckDelete: "Удалить колоду",
   deckDeleteConfirm: "Удалить колоду? Её карточки переедут в «Общую».",
   deckManage: "Колода", deckSaveTo: "В какую колоду сохранить?", deckStudy: "Колода",
+  moveToDeck: "В колоду", moveToDeckTitle: "Переместить в колоду",
   deckHint: "Грамматика и слово дня по-прежнему берут все карточки.",
 };
 

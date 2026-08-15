@@ -7,6 +7,7 @@ import { haptic } from "../lib/telegram";
 import { inDeck, withCounts, generalCount } from "../lib/decks";
 import { CardDetail } from "./CardDetail";
 import { DeckChips } from "./DeckChips";
+import { DeckPickerSheet } from "./DeckPickerSheet";
 
 const DELETE_THRESHOLD = 90;
 
@@ -19,6 +20,7 @@ export function Library({
   onCreateDeck,
   onRenameDeck,
   onDeleteDeck,
+  onMoveCards,
 }: {
   cards: Card[];
   decks: Deck[];
@@ -28,6 +30,8 @@ export function Library({
   onCreateDeck: (name: string) => Promise<Deck>;
   onRenameDeck: (id: string, name: string) => Promise<void>;
   onDeleteDeck: (id: string) => Promise<void>;
+  /** Files a batch of existing cards into a deck; null = the general deck. */
+  onMoveCards: (cardIds: string[], deckId: string | null) => Promise<void>;
 }) {
   const { t } = usePrefs();
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -39,6 +43,8 @@ export function Library({
   // Deck being renamed/deleted after a long press, and the "new deck" prompt.
   const [managed, setManaged] = useState<Deck | null>(null);
   const [naming, setNaming] = useState(false);
+  // Open deck picker for the checked cards.
+  const [movingTo, setMovingTo] = useState(false);
   const selectedCard = cards.find((c) => c.id === selectedId) ?? null;
   const shown = inDeck(cards, deckId);
   const deckList = withCounts(decks, cards);
@@ -74,6 +80,12 @@ export function Library({
     });
   }
 
+  // Everything currently on screen, i.e. within the deck filter - so "sort the
+  // general pile" is: filter to it, select all, move.
+  function toggleAllShown() {
+    setChecked((prev) => (prev.size === shown.length ? new Set() : new Set(shown.map((c) => c.id))));
+  }
+
   async function deleteChecked() {
     setBusy(true);
     const ids = [...checked];
@@ -81,6 +93,20 @@ export function Library({
     setChecked(new Set());
     setSelectMode(false);
     setBusy(false);
+  }
+
+  async function moveChecked(value: string) {
+    setBusy(true);
+    try {
+      await onMoveCards([...checked], value === "none" ? null : value);
+      setMovingTo(false);
+      setChecked(new Set());
+      setSelectMode(false);
+    } catch (err) {
+      console.error("Failed to move cards", err);
+    } finally {
+      setBusy(false);
+    }
   }
 
   function exitSelect() {
@@ -117,18 +143,17 @@ export function Library({
           <div className="flex gap-2">
             <button
               type="button"
+              onClick={toggleAllShown}
+              className="rounded-full border-2 border-black bg-white px-3 py-1 text-sm font-semibold text-ink shadow-toon-sm"
+            >
+              {checked.size === shown.length ? t("aiClearSel") : t("aiSelectAll")}
+            </button>
+            <button
+              type="button"
               onClick={exitSelect}
               className="rounded-full border-2 border-black bg-white px-3 py-1 text-sm font-semibold text-ink shadow-toon-sm"
             >
               {t("cancel")}
-            </button>
-            <button
-              type="button"
-              disabled={busy || checked.size === 0}
-              onClick={deleteChecked}
-              className="rounded-full border-2 border-black bg-rose-400 px-3 py-1 text-sm font-semibold text-ink shadow-toon-sm disabled:opacity-50"
-            >
-              {t("deleteSelected")}
             </button>
           </div>
         ) : (
@@ -165,6 +190,39 @@ export function Library({
           />
         ))}
       </div>
+
+      {/* Bulk actions sit at the bottom, in thumb reach. */}
+      {selectMode && (
+        <div className="flex gap-2 pb-1 pt-1">
+          <button
+            type="button"
+            disabled={busy || checked.size === 0}
+            onClick={() => setMovingTo(true)}
+            className="flex-1 rounded-2xl border-2 border-black bg-sky px-4 py-2.5 text-sm font-semibold text-ink shadow-toon-sm disabled:opacity-50"
+          >
+            🗂 {t("moveToDeck")}
+          </button>
+          <button
+            type="button"
+            disabled={busy || checked.size === 0}
+            onClick={deleteChecked}
+            className="rounded-2xl border-2 border-black bg-rose-400 px-4 py-2.5 text-sm font-semibold text-ink shadow-toon-sm disabled:opacity-50"
+          >
+            {t("delete")}
+          </button>
+        </div>
+      )}
+
+      {movingTo && (
+        <DeckPickerSheet
+          decks={deckList}
+          value={deckId && deckId !== "none" ? deckId : "none"}
+          title={`${t("moveToDeckTitle")} · ${checked.size}`}
+          onCreate={onCreateDeck}
+          onConfirm={moveChecked}
+          onCancel={() => setMovingTo(false)}
+        />
+      )}
 
       {selectedCard && (
         <CardDetail

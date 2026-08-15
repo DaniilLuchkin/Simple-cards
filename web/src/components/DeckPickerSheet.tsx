@@ -13,12 +13,15 @@ import { DeckChips } from "./DeckChips";
 export function DeckPickerSheet({
   decks,
   value,
+  title,
   onCreate,
   onConfirm,
   onCancel,
 }: {
   decks: Deck[];
   value: string;
+  /** Defaults to the save-time wording; bulk moves pass their own. */
+  title?: string;
   onCreate: (name: string) => Promise<Deck>;
   onConfirm: (value: string) => void;
   onCancel: () => void;
@@ -46,7 +49,7 @@ export function DeckPickerSheet({
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center">
       <div className="w-full max-w-sm rounded-[18px] border-2 border-black bg-surface p-5 shadow-toon-lg">
-        <h3 className="mb-3 text-base font-bold text-ink">{t("deckSaveTo")}</h3>
+        <h3 className="mb-3 text-base font-bold text-ink">{title ?? t("deckSaveTo")}</h3>
 
         <DeckChips
           decks={decks}

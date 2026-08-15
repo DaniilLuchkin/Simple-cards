@@ -599,6 +599,38 @@ cardsRouter.patch("/:id", async (req, res) => {
   res.json({ card: toApiCard(updated) });
 });
 
+const moveSchema = z.object({
+  cardIds: z.array(z.string().max(64)).min(1).max(500),
+  // null = back to the general deck.
+  deckId: z.string().max(64).nullable(),
+});
+
+// Files a batch of existing cards into a deck in one go, so a pile that built
+// up before decks existed can be sorted a screenful at a time. Unlike PATCH,
+// an unknown deck is an error rather than a silent fallback to the general
+// deck - dumping a whole selection in the wrong place is not a small mistake.
+cardsRouter.post("/move", async (req, res) => {
+  const parsed = moveSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten() });
+    return;
+  }
+
+  const userId = req.dbUserId!;
+  const { cardIds, deckId } = parsed.data;
+  if (deckId !== null && !(await ownedDeckId(userId, deckId))) {
+    res.status(404).json({ error: "Deck not found" });
+    return;
+  }
+
+  // Scoped by userId, so ids belonging to anyone else simply don't match.
+  const { count } = await prisma.card.updateMany({
+    where: { id: { in: cardIds }, userId },
+    data: { deckId },
+  });
+  res.json({ count });
+});
+
 // Upload a custom image for a card. The raw image bytes are the request body
 // (Content-Type image/*); global express.json() ignores non-JSON bodies, so the
 // per-route express.raw parser owns it. Mirrors the bot's saveImage flow.
