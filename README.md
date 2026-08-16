@@ -207,16 +207,19 @@ Docker-сборку. Работайте в отдельной ветке и ме
 боевого бота.
 
 **2. Данные (Railway ещё работает).** Сначала проверьте мажорную версию
-Postgres — дамп из 17-й не восстановится в 16-ю:
+Postgres на источнике — она должна совпадать с образом в
+`docker-compose.prod.yml` (сейчас там `postgres:18-alpine`) или быть старше
+него. Дамп из более новой версии в более старую не восстановится, а `pg_dump`
+старше сервера просто откажется работать:
 
 ```bash
-docker run --rm postgres:16-alpine psql "$RAILWAY_DATABASE_PUBLIC_URL" -c 'select version()'
+docker run --rm postgres:18-alpine psql "$RAILWAY_DATABASE_PUBLIC_URL" -c 'select version()'
 ```
 
 Дамп и восстановление:
 
 ```bash
-docker run --rm -v "$PWD:/backup" postgres:16-alpine \
+docker run --rm -v "$PWD:/backup" postgres:18-alpine \
   pg_dump --format=custom --no-owner --no-privileges \
           --file=/backup/railway.pgc "$RAILWAY_DATABASE_PUBLIC_URL"
 

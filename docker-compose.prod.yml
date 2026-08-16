@@ -18,7 +18,10 @@ x-logging: &logging
 
 services:
   postgres:
-    image: postgres:16-alpine
+    # Must be >= the major version the data was dumped from (Railway ran 18.4).
+    # The local dev stack in docker-compose.yml stays on 16: its volume is
+    # already initialised with that major and won't open under a newer one.
+    image: postgres:18-alpine
     restart: unless-stopped
     logging: *logging
     environment:
