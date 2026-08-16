@@ -80,9 +80,14 @@ services:
     depends_on:
       - app
     ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp" # HTTP/3
+      # BIND_IP exists for hosts where something else already holds :443 (a
+      # Tailscale Serve endpoint, another proxy). Binding 0.0.0.0 collides with
+      # any existing bind on the same port, so on a shared host set BIND_IP to
+      # the instance's own address instead. Behind Oracle's 1:1 NAT that is the
+      # private IP of the interface - public traffic arrives on it.
+      - "${BIND_IP:-0.0.0.0}:80:80"
+      - "${BIND_IP:-0.0.0.0}:443:443"
+      - "${BIND_IP:-0.0.0.0}:443:443/udp" # HTTP/3
     environment:
       APP_DOMAIN: ${APP_DOMAIN:?APP_DOMAIN is not set in .env}
       ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL is not set in .env}
