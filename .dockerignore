@@ -1,0 +1,43 @@
+# VCS / editor
+.git
+.gitattributes
+.gitignore
+.github
+.vscode
+.idea
+.DS_Store
+
+# Installed and built artifacts - the image builds its own.
+node_modules
+**/node_modules
+dist
+**/dist
+build
+**/build
+# tsc -b caches here; a stale one leaking in can make it skip the build.
+**/*.tsbuildinfo
+.pnpm-store
+
+# Secrets and local state: must never enter the build context.
+.env
+**/.env
+**/.env.*
+!**/.env.example
+uploads
+**/uploads
+data
+backups
+*.log
+**/prisma/dev.db
+
+# Deployment and docs: not needed inside the image, and editing them should not
+# bust the dependency cache. docker/ is NOT ignored - entrypoint.sh is copied in.
+Dockerfile
+.dockerignore
+docker-compose.yml
+docker-compose.prod.yml
+Caddyfile
+deploy.sh
+backup.sh
+README.md
+assets

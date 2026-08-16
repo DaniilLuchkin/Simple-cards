@@ -1,8 +1,8 @@
 import "dotenv/config";
 import { z } from "zod";
 
-// Accepts both a full URL and a bare domain (Railway shows domains without a
-// scheme, so "web-production-xxxx.up.railway.app" pasted as-is should work).
+// Accepts both a full URL and a bare domain, so "cards.duckdns.org" pasted
+// as-is works the same as "https://cards.duckdns.org".
 // URLs can't contain whitespace or quotes, so those are typos - drop them.
 function normalizeUrl(value: string | undefined): string | undefined {
   const trimmed = value?.replace(/[\s"']+/g, "");
@@ -15,12 +15,13 @@ function normalizeUrl(value: string | undefined): string | undefined {
   }
 }
 
-// Railway injects RAILWAY_PUBLIC_DOMAIN once a public domain is generated for
-// the service, which lets the URL-shaped settings below default sensibly there.
-const railwayUrl = normalizeUrl(process.env.RAILWAY_PUBLIC_DOMAIN);
-
 const schema = z.object({
   TELEGRAM_BOT_TOKEN: z.string().min(1),
+  // Public host of the deployment, e.g. "cards.duckdns.org" (bare domain or
+  // full URL). docker-compose hands the same value to the reverse proxy that
+  // terminates TLS, so the proxy and the app can't disagree about the public
+  // origin. The URL-shaped settings below default to it.
+  APP_DOMAIN: z.string().optional(),
   // Public HTTPS URL of the Mini App: the bot's web-app button target and the
   // default allowed CORS origin.
   MINI_APP_URL: z.string().optional(),
@@ -41,7 +42,7 @@ const schema = z.object({
   REMINDER_LOCAL_HOUR: z.coerce.number().int().min(0).max(23).default(19),
 
   // Where uploaded card images are stored on disk. Point this at a mounted
-  // volume (e.g. /data/uploads) for persistence across deploys.
+  // volume (in Docker: /data/uploads) so images survive a redeploy.
   UPLOADS_DIR: z.string().default("uploads"),
   // Origin that serves /uploads (this server). Differs from MINI_APP_URL when
   // the Mini App is deployed as a separate service.
@@ -50,11 +51,14 @@ const schema = z.object({
 
 const parsed = schema.parse(process.env);
 
-const MINI_APP_URL = normalizeUrl(parsed.MINI_APP_URL) ?? railwayUrl;
+const appUrl = normalizeUrl(parsed.APP_DOMAIN);
+
+const MINI_APP_URL = normalizeUrl(parsed.MINI_APP_URL) ?? appUrl;
 if (!MINI_APP_URL) {
   throw new Error(
-    "MINI_APP_URL is not set and could not be inferred from RAILWAY_PUBLIC_DOMAIN. " +
-      "Set it explicitly (e.g. in .env for local dev, or generate a public domain on Railway)."
+    "MINI_APP_URL is not set and could not be inferred from APP_DOMAIN. " +
+      "Set APP_DOMAIN to the public host of this deployment " +
+      "(e.g. cards.duckdns.org), or set MINI_APP_URL explicitly."
   );
 }
 
@@ -64,5 +68,5 @@ export const env = {
   CORS_ORIGINS: (parsed.CORS_ORIGIN?.split(",") ?? [MINI_APP_URL])
     .map(normalizeUrl)
     .filter((origin): origin is string => Boolean(origin)),
-  PUBLIC_ORIGIN: normalizeUrl(parsed.PUBLIC_ORIGIN) ?? railwayUrl ?? MINI_APP_URL,
+  PUBLIC_ORIGIN: normalizeUrl(parsed.PUBLIC_ORIGIN) ?? appUrl ?? MINI_APP_URL,
 };

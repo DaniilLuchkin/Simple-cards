@@ -13,10 +13,12 @@ Telegram Mini App для изучения английских слов. При�
   (OpenRouter), `services.ts` (работа с БД + генерация), `storage.ts`
   (картинки на диске), `sm2.ts` (интервальные повторения), `env.ts` (конфиг).
 - `web/` — Telegram Mini App (React + Vite + Tailwind).
+- Деплой: `Dockerfile`, `docker-compose.prod.yml`, `Caddyfile`, `deploy.sh`,
+  `backup.sh` — см. раздел про деплой ниже.
 
-В проде `server` может отдавать собранный `web/dist` как статику из того же
-процесса (см. `server/src/app.ts`) — тогда это один деплой-юнит. В разработке
-удобнее гонять их раздельно (hot reload у Vite).
+В проде `server` отдаёт собранный `web/dist` как статику из того же процесса
+(см. `server/src/app.ts`) — это один деплой-юнит. В разработке удобнее гонять
+их раздельно (hot reload у Vite).
 
 ## Как это работает
 
@@ -56,7 +58,7 @@ Telegram Mini App для изучения английских слов. При�
 
 ```bash
 pnpm install
-docker compose up -d   # поднимает только postgres
+docker compose up -d   # поднимает только postgres (прод — docker-compose.prod.yml)
 ```
 
 ```bash
@@ -73,10 +75,11 @@ pnpm dev                 # http://localhost:5173, ходит в API на :3000
 ```
 
 Бота создаёте через [@BotFather](https://t.me/BotFather): `/newbot`, токен — в
-`TELEGRAM_BOT_TOKEN`. По умолчанию `MINI_APP_URL` смотрит на `localhost:3000`
-(локально это адрес собранной статики, если её собрать; для теста кнопки бота
-вживую нужен публичный HTTPS — Telegram требует его для Web App, проще всего
-сразу проверять задеплоенную версию).
+`TELEGRAM_BOT_TOKEN`. Локально `MINI_APP_URL` смотрит на `localhost:3000`
+(это адрес собранной статики, если её собрать; для теста кнопки бота вживую
+нужен публичный HTTPS — Telegram требует его для Web App, проще всего сразу
+проверять задеплоенную версию). В проде эта переменная не задаётся руками —
+она выводится из `APP_DOMAIN`, см. раздел про деплой.
 
 OpenRouter: ключ на https://openrouter.ai/keys, модель задаётся `OPENROUTER_MODEL`
 (по умолчанию `openai/gpt-5.6-luna`; можно поставить любой slug OpenRouter —
@@ -88,58 +91,178 @@ OpenRouter: ключ на https://openrouter.ai/keys, модель задаёт�
 никакого внешнего объектного хранилища для локальной разработки не нужно.
 
 Откройте Mini App через сам Telegram, чтобы `window.Telegram.WebApp.initData`
-был доступен — без него API отвечает 401 (см. `server/src/middleware/telegramAuth.ts`).
+был доступен — без него API отвечает 401 (см. `server/src/auth.ts`).
 
-## Деплой на Railway
+## Деплой на свой сервер (Docker Compose)
 
-Самый простой вариант — **один сервис**: `server` на старте сам отдаёт собранный
-фронтенд (статикой) плюс API плюс бот. Никакого второго сервиса, никакого CORS
-между ними, никакого внешнего S3 — картинки лежат на Railway Volume.
+Разворачивается три контейнера, всё описано файлами в репозитории:
 
-1. **Postgres** — в проекте: `New` → `Database` → `PostgreSQL`.
+- **`app`** — Express API + бот + собранный `web/dist` в одном процессе.
+- **`postgres`** — база с именованным томом.
+- **`caddy`** — единственный смотрит наружу (80/443), сам получает и продлевает
+  сертификат Let's Encrypt.
 
-2. **Сервис** — `New` → `GitHub Repo` → этот репозиторий. Root Directory
-   оставьте корнем репо (нужен доступ и к `server/`, и к `web/`).
-   - Build Command:
-     `corepack enable && pnpm install --frozen-lockfile && pnpm --filter @simple-cards/web build && pnpm --filter @simple-cards/server build`
-   - Start Command: `pnpm --filter @simple-cards/server start`
-     (сам прогонит `prisma migrate deploy` перед запуском)
-   - Settings → Networking → **Generate Domain**. Как только домен появится,
-     Railway положит его в переменную `RAILWAY_PUBLIC_DOMAIN`, а сервер сам
-     возьмёт её для `MINI_APP_URL` и `CORS_ORIGIN` — вручную их задавать
-     не нужно (см. `server/src/env.ts`).
-   - Держите **1 instance/replica** — бот работает через long polling, два
-     одновременных процесса будут конфликтовать за апдейты.
+Порты Postgres и приложения наружу **не публикуются** — они доступны только
+внутри сети Compose.
 
-3. **Переменные окружения** (Variables): только то, что реально нужно задать руками —
-   - `TELEGRAM_BOT_TOKEN`
-   - `OPENROUTER_API_KEY` (+ `OPENROUTER_MODEL`, если хотите модель не по умолчанию)
-   - `DATABASE_URL` = `${{ Postgres.DATABASE_URL }}`
+### Что нужно
 
-4. **Volume для картинок** (чтобы не терять их при редеплое) — Settings →
-   Volumes → Add Volume, mount path `/data`. Затем добавьте переменную
-   `UPLOADS_DIR=/data/uploads`. Без этого шага приложение тоже заработает —
-   картинки просто будут жить на эфемерном диске и пропадут при следующем
-   деплое/рестарте, для обкатки это нормально.
+- Виртуалка. Подойдёт Oracle Cloud Always Free: **Ampere A1** (aarch64,
+  до 4 OCPU / 24 ГБ) — образ собирается на ней нативно. На x86-микроинстансе
+  с 1 ГБ памяти `vite build` упирается в OOM: добавьте 2 ГБ swap.
+- **Домен.** Telegram открывает Mini App только по HTTPS с валидным
+  сертификатом — на голый IP не заработает. Годится бесплатный поддомен
+  DuckDNS; свой домен подключается заменой одной строки `APP_DOMAIN`.
+- Docker и плагин Compose.
 
-5. Кнопка меню (возле поля ввода), список команд и описания бота («что умеет
-   этот бот» до первого /start) настраиваются автоматически при старте сервера
-   (см. `setupBotProfile` в `server/src/bot.ts`) — в BotFather ничего задавать
-   не нужно. Единственное, что Bot API не позволяет сделать программно — аватар
-   бота: отправьте BotFather команду `/setuserpic` и загрузите `assets/logo.png`.
+### Настройка
 
-### Если всё же нужны два сервиса
+1. **Сеть.** В Security List подсети добавьте ingress: TCP 80, TCP 443 и
+   UDP 443 (HTTP/3) с `0.0.0.0/0`. Это обязательный шаг — фаервол OCI живёт
+   снаружи виртуалки.
 
-Например, если Railway сам разбил монорепо на два сервиса, или захочется
-отдавать фронтенд через CDN отдельно. Тогда:
-- `server`: тот же Build/Start, но без шага сборки `web`; задайте `MINI_APP_URL`
-  вручную = домен сервиса `web` (CORS настроится сам — он по умолчанию равен
-  `MINI_APP_URL`; картинки тоже — они по умолчанию отдаются с собственного
-  Railway-домена сервера).
-- `web`: Build — `pnpm --filter @simple-cards/web build`, Start —
-  `pnpm --filter @simple-cards/web start` (раздаёт `dist/` через `serve`).
-  Переменная `VITE_API_URL` = домен сервиса `server` (build-time, нужен redeploy
-  при смене).
+   Про iptables на образах Oracle: опубликованные Docker'ом порты проходят
+   через DNAT и цепочку `FORWARD`, а не `INPUT`, поэтому стоковое
+   REJECT-правило им обычно не мешает. Реальная опасность другая — не
+   запускайте `netfilter-persistent reload` при поднятом стеке: восстановление
+   правил стирает цепочки Docker (лечится `sudo systemctl restart docker`).
+   Явные ACCEPT можно добавить для определённости:
+
+   ```bash
+   sudo iptables -L INPUT --line-numbers -n     # найдите номер строки REJECT
+   sudo iptables -I INPUT <N> -p tcp --dport 80  -j ACCEPT
+   sudo iptables -I INPUT <N> -p tcp --dport 443 -j ACCEPT
+   sudo iptables -I INPUT <N> -p udp --dport 443 -j ACCEPT
+   sudo netfilter-persistent save
+   ```
+
+2. **DNS.** Заведите поддомен на duckdns.org и направьте на публичный IP
+   виртуалки. IP лучше сделать **Reserved**: у эфемерного он меняется при
+   stop/start, и TLS отваливается. Проверьте `dig +short <домен>` до первого
+   запуска — неудачные попытки ACME расходуют лимит Let's Encrypt.
+
+3. **Развёртывание.**
+
+   ```bash
+   sudo mkdir -p /opt/simple-cards/{uploads,backups}
+   sudo chown -R "$USER" /opt/simple-cards
+   git clone <репозиторий> /opt/simple-cards/app
+   cd /opt/simple-cards/app
+   cp .env.example .env && chmod 600 .env && nano .env
+   # uid пользователя node внутри образа:
+   sudo chown -R 1000:1000 /opt/simple-cards/uploads
+   ./deploy.sh
+   ```
+
+`deploy.sh` идемпотентен: бэкап → `git pull --ff-only` → сборка образа →
+`up -d` → ожидание healthcheck (при провале печатает логи и выходит с ошибкой)
+→ очистка висящих образов. Флаг `--no-pull` собирает из текущего дерева.
+`prisma migrate deploy` выполняется в entrypoint контейнера при каждом старте.
+
+### Что важно знать
+
+- **Только один экземпляр.** Бот работает через long polling: два процесса с
+  одним токеном дерутся за апдейты и получают от Telegram 409. Не масштабируйте
+  сервис `app`.
+- **Смена домена** — одна строка `APP_DOMAIN` в `.env` плюс `./deploy.sh`.
+  `MINI_APP_URL`, `PUBLIC_ORIGIN` и CORS выводятся из неё (`server/src/env.ts`),
+  а кнопка меню бота перенастраивается сама при старте (`setupBotProfile`).
+  В путях картинок в БД хранится только относительная часть, поэтому смена
+  домена их не ломает.
+- **Бэкапы.** `./backup.sh` кладёт дамп базы (`pg_dump -Fc` изнутри контейнера)
+  и tar каталога картинок в `BACKUP_DIR`, с ротацией. В cron:
+
+  ```
+  0 3 * * * /opt/simple-cards/app/backup.sh >> /var/log/simple-cards-backup.log 2>&1
+  ```
+
+  Восстановление дампа:
+
+  ```bash
+  docker compose -f docker-compose.prod.yml cp backups/db-<ts>.pgc postgres:/tmp/r.pgc
+  docker compose -f docker-compose.prod.yml exec -T postgres \
+    pg_restore -U simplecards -d simplecards --clean --if-exists \
+               --no-owner --no-privileges /tmp/r.pgc
+  ```
+
+- Кнопка меню, список команд и описания бота настраиваются автоматически при
+  старте (`setupBotProfile` в `server/src/bot.ts`) — в BotFather ничего задавать
+  не нужно. Единственное, чего Bot API не умеет программно — аватар: отправьте
+  BotFather `/setuserpic` и загрузите `assets/logo.png`.
+
+### Миграция с Railway
+
+Порядок важен: два поллера с одним токеном конфликтуют, поэтому Railway гасится
+**до** первого запуска с боевым токеном на новом сервере.
+
+**0. Подготовка (без простоя).** В переменных Railway задайте `MINI_APP_URL`
+явно (текущий railway-домен), сделайте редеплой и убедитесь, что бот жив.
+Это нужно потому, что фолбэк на `RAILWAY_PUBLIC_DOMAIN` из кода убран, а
+появившийся в корне `Dockerfile` заставит Railway переключиться с Nixpacks на
+Docker-сборку. Работайте в отдельной ветке и мерджите в `main` только после
+успешного переезда.
+
+**1. Сервер.** Пройдите «Настройка» выше целиком, но в `.env` подставьте
+**тестовый** токен бота (`@BotFather → /newbot`) — так репетиция не заденет
+боевого бота.
+
+**2. Данные (Railway ещё работает).** Сначала проверьте мажорную версию
+Postgres — дамп из 17-й не восстановится в 16-ю:
+
+```bash
+docker run --rm postgres:16-alpine psql "$RAILWAY_DATABASE_PUBLIC_URL" -c 'select version()'
+```
+
+Дамп и восстановление:
+
+```bash
+docker run --rm -v "$PWD:/backup" postgres:16-alpine \
+  pg_dump --format=custom --no-owner --no-privileges \
+          --file=/backup/railway.pgc "$RAILWAY_DATABASE_PUBLIC_URL"
+
+docker compose -f docker-compose.prod.yml up -d postgres
+docker compose -f docker-compose.prod.yml cp railway.pgc postgres:/tmp/railway.pgc
+docker compose -f docker-compose.prod.yml exec -T postgres \
+  pg_restore -U simplecards -d simplecards --clean --if-exists \
+             --no-owner --no-privileges /tmp/railway.pgc
+```
+
+Сверьте `select count(*) from "Card"` и `select migration_name from
+_prisma_migrations` — все миграции должны быть отмечены применёнными, тогда
+`migrate deploy` при старте будет no-op.
+
+Картинки с тома Railway:
+
+```bash
+railway ssh -- tar -C /data -cf - uploads | gzip > uploads.tar.gz
+tar -xzf uploads.tar.gz -C /tmp && rsync -a /tmp/uploads/ /opt/simple-cards/uploads/
+sudo chown -R 1000:1000 /opt/simple-cards/uploads
+```
+
+Если `railway ssh` недоступен — файлы отдаются по HTTP с ещё живого домена,
+можно выкачать по списку `imageUrl` из базы.
+
+Прогоните `./deploy.sh --no-pull` и проверьте всё на тестовом боте: `/health`
+отвечает, Mini App открывается, старые карточки и их картинки видны.
+
+**3. Переключение (единственное окно простоя, ~5–10 минут).**
+
+1. `docker compose -f docker-compose.prod.yml stop app` на сервере.
+2. **Погасите сервис на Railway** — именно процесс, снять домен недостаточно.
+3. Повторите финальный дамп/восстановление и `rsync` картинок (заберёт всё,
+   что пользователи успели сделать).
+4. Подставьте боевой `TELEGRAM_BOT_TOKEN` в `.env` и запустите `./deploy.sh`.
+
+Проверьте: `/health` → `{"ok":true}`; в логах «Telegram bot started», без 409;
+`getWebhookInfo` возвращает пустой `url`; в Telegram бот отвечает на `/start`,
+кнопка меню ведёт на новый домен, старые карточки с картинками на месте,
+новая карточка создаётся.
+
+**Откат.** В пределах окна: погасить `app` на сервере и снова запустить Railway
+(там `MINI_APP_URL` уже задан явно) — база на Railway не тронута, экспозиция
+пара минут. После того как пользователи начали писать на новый сервер, откат
+означает перенос дельты обратно, так что решать нужно в первые часы. Проект на
+Railway держите на паузе, не удаляйте, недели две.
 
 ## SRS-карточка (основной режим повторения)
 
@@ -245,7 +368,7 @@ hi, ar, fa; словарь и список — `web/src/lib/i18n.ts`, недос
 - Сгенерированная карточка добавляется в колоду сразу, без отдельного шага
   подтверждения — осознанный выбор, правки и удаление доступны позже во
   вкладке «Мои карточки» или прямо в стопке повторения.
-- Картинки хранятся на локальном диске сервиса (или Railway Volume), а не в
-  объектном хранилище — для одного инстанса этого достаточно; если позже
-  понадобится горизонтальное масштабирование сервера, нужно будет вернуться
-  к S3-совместимому хранилищу.
+- Картинки хранятся на диске сервера (bind-mount `/opt/simple-cards/uploads`,
+  входит в `backup.sh`), а не в объектном хранилище — для одного инстанса этого
+  достаточно; если позже понадобится горизонтальное масштабирование сервера,
+  нужно будет вернуться к S3-совместимому хранилищу.

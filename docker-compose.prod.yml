@@ -1,0 +1,92 @@
+# Production stack for a single self-managed VM: app + postgres + caddy.
+#
+#   docker compose -f docker-compose.prod.yml up -d     (or ./deploy.sh)
+#
+# A standalone file rather than an override of docker-compose.yml: Compose
+# *merges* `ports` across -f files and cannot remove one, so the 5432 the dev
+# file publishes could never be un-published by an override.
+#
+# Only caddy publishes ports. Postgres and the app are reachable on the internal
+# network only - do not add a `ports:` entry to either.
+name: simple-cards-prod
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-simplecards}
+      POSTGRES_DB: ${POSTGRES_DB:-simplecards}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is not set in .env}
+      # Keeps dump/restore output stable across hosts with different locales.
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-simplecards} -d ${POSTGRES_DB:-simplecards}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: simple-cards-app:latest
+    restart: unless-stopped
+    logging: *logging
+    # tini as PID 1: reaps zombies and forwards signals.
+    init: true
+    # The bot polls Telegram; give the SIGTERM handler in server/src/index.ts
+    # room to finish the update in flight before docker resorts to SIGKILL.
+    stop_grace_period: 30s
+    # Long polling means exactly one process may hold the token - a second one
+    # gets 409 from Telegram. Never scale this service.
+    scale: 1
+    env_file: .env
+    environment:
+      # Container-internal paths, kept out of .env so they can't drift.
+      PORT: "3000"
+      UPLOADS_DIR: /data/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      # A bind mount rather than a named volume: card images are the one piece
+      # of state Postgres doesn't hold, and a plain host path makes backing them
+      # up a `tar`. The directory must be owned by uid 1000 (`node` in the image).
+      - ${UPLOADS_HOST_DIR:-./data/uploads}:/data/uploads
+    # healthcheck comes from HEALTHCHECK in the Dockerfile.
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    logging: *logging
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp" # HTTP/3
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?APP_DOMAIN is not set in .env}
+      ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL is not set in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Certificates and the ACME account live here. Losing this volume means
+      # re-issuing and burning Let's Encrypt rate limits.
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:

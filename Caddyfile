@@ -1,0 +1,38 @@
+# Caddy terminates TLS and proxies everything to the app container.
+# Certificates are obtained and renewed automatically, which is the whole reason
+# Caddy is here: Telegram refuses to open a Mini App without valid HTTPS.
+
+{
+	email {$ACME_EMAIL}
+}
+
+{$APP_DOMAIN} {
+	encode zstd gzip
+
+	# Card photos are POSTed as raw image/* bodies, capped at 12mb by
+	# express.raw. Keep the proxy ceiling above that so an oversized upload
+	# gets the app's own error instead of an opaque 413 from the edge.
+	request_body {
+		max_size 16MB
+	}
+
+	# Uploaded images are UUID-named and never rewritten, so they cache forever.
+	@uploads path /uploads/*
+	header @uploads Cache-Control "public, max-age=31536000, immutable"
+
+	# Everything goes to the app: it owns /api, /uploads and the SPA fallback
+	# (server/src/app.ts), so routing has exactly one source of truth.
+	reverse_proxy app:3000 {
+		# Generating a card set with images goes through an LLM and can take
+		# minutes; the default timeouts would cut it off.
+		transport http {
+			read_timeout 300s
+			write_timeout 300s
+		}
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

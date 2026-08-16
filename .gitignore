@@ -7,6 +7,9 @@ build
 *.log
 .DS_Store
 uploads/
+# Local state of the production stack when it runs with default paths.
+data/
+backups/
 .pnpm-store
 prisma/dev.db
 *.tsbuildinfo
