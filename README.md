@@ -200,6 +200,30 @@ OpenRouter: ключ на https://openrouter.ai/keys, модель задаёт�
   не нужно. Единственное, чего Bot API не умеет программно — аватар: отправьте
   BotFather `/setuserpic` и загрузите `assets/logo.png`.
 
+### Частые грабли
+
+Собрано по итогам реального переезда — каждый пункт стоил отдельного захода.
+
+- **Порт 443 забывают открыть.** В Security List нужны оба правила, 80 и 443.
+  Если открыт только 80, `curl http://…` вернёт редирект `308`, а `https://`
+  будет висеть в таймауте, и Caddy не пройдёт `tls-alpn-01`.
+- **`APP_DOMAIN` должен совпадать с зарегистрированным именем посимвольно.**
+  Значение-пример из `.env.example` легко оставить нетронутым, и тогда в логах
+  Caddy будет `NXDOMAIN` про домен, которого не существует.
+- **Проверять снаружи, а не с самой виртуалки.** Oracle не делает hairpin NAT:
+  запрос с сервера на свой же публичный IP даёт таймаут, даже когда всё
+  работает. Изнутри проверяйте через
+  `curl --resolve <домен>:443:<приватный-IP>`, снаружи — из браузера.
+- **`POSTGRES_PASSWORD` действует только при первичной инициализации тома.**
+  Если пароль в `DATABASE_URL` разошёлся с ним, Prisma получит `P1000`;
+  править `.env` мало, нужно ещё `ALTER USER … WITH PASSWORD` в самой базе.
+  Пароль лучше брать из букв и цифр: спецсимволы в URL требуют кодирования.
+- **`up -d --force-recreate app` поднимает только `app`.** Caddy при этом
+  остаётся не запущенным, и наружу никто не отвечает. Поднимайте весь стек:
+  `up -d` без имени сервиса, или через `./deploy.sh`.
+- **`cron` может отсутствовать** на минимальном образе — `sudo apt-get install
+  -y cron` перед настройкой бэкапов.
+
 ### Миграция с Railway
 
 Порядок важен: два поллера с одним токеном конфликтуют, поэтому Railway гасится
@@ -244,27 +268,52 @@ docker compose -f docker-compose.prod.yml exec -T postgres \
 _prisma_migrations` — все миграции должны быть отмечены применёнными, тогда
 `migrate deploy` при старте будет no-op.
 
-Картинки с тома Railway:
+Картинки. Проще всего забрать их по HTTP с ещё живого старого хостинга: они
+отдаются публично, а список файлов лежит в самой базе. Ни Railway CLI, ни
+доступа к тому не требуется. Каталог загрузок к этому моменту уже принадлежит
+uid 1000, поэтому на время закачки забираем его себе:
 
 ```bash
-railway ssh -- tar -C /data -cf - uploads | gzip > uploads.tar.gz
-tar -xzf uploads.tar.gz -C /tmp && rsync -a /tmp/uploads/ /opt/simple-cards/uploads/
+sudo chown -R "$(id -u):$(id -g)" /opt/simple-cards/uploads
+mkdir -p /opt/simple-cards/uploads/cards
+
+export RAILWAY_APP='https://<старый-домен>'
+docker run --rm postgres:18-alpine psql "$RAILWAY_DATABASE_PUBLIC_URL" -At \
+  -c "select \"imageUrl\" from \"Card\" where \"imageUrl\" is not null and \"imageUrl\" <> ''" \
+  | sed -E 's#^https?://[^/]+##' | sort -u > image-paths.txt
+
+cat > /tmp/fetch-image.sh <<'EOF'
+#!/bin/sh
+p="$1"
+dest="/opt/simple-cards/uploads${p#/uploads}"
+[ -f "$dest" ] && exit 0
+curl -fsS --retry 3 "$RAILWAY_APP$p" -o "$dest" || { rm -f "$dest"; echo "FAILED $p" >&2; }
+EOF
+chmod +x /tmp/fetch-image.sh
+
+xargs -P 8 -n 1 /tmp/fetch-image.sh < image-paths.txt
+find /opt/simple-cards/uploads -type f | wc -l    # сравните с wc -l image-paths.txt
 sudo chown -R 1000:1000 /opt/simple-cards/uploads
 ```
 
-Если `railway ssh` недоступен — файлы отдаются по HTTP с ещё живого домена,
-можно выкачать по списку `imageUrl` из базы.
+Скрипт пропускает уже скачанное, так что его можно гонять повторно — этим и
+пользуемся на шаге 3. Шаг необязательный: без картинок карточки отображаются
+нормально, но перегенерация делается по одной из детального экрана, массовой
+кнопки нет.
 
 Прогоните `./deploy.sh --no-pull` и проверьте всё на тестовом боте: `/health`
 отвечает, Mini App открывается, старые карточки и их картинки видны.
 
 **3. Переключение (единственное окно простоя, ~5–10 минут).**
 
-1. `docker compose -f docker-compose.prod.yml stop app` на сервере.
-2. **Погасите сервис на Railway** — именно процесс, снять домен недостаточно.
-3. Повторите финальный дамп/восстановление и `rsync` картинок (заберёт всё,
-   что пользователи успели сделать).
-4. Подставьте боевой `TELEGRAM_BOT_TOKEN` в `.env` и запустите `./deploy.sh`.
+1. Догоните картинки — повторите блок из шага 2, пока Railway **ещё работает**.
+   Файлы отдаёт приложение, и после его остановки забрать их будет неоткуда,
+   тогда как база останется доступна.
+2. `docker compose -f docker-compose.prod.yml stop app` на сервере.
+3. **Погасите сервис на Railway** — именно процесс, снять домен недостаточно.
+4. Повторите финальный дамп и восстановление: заберёт всё, что пользователи
+   успели сделать с момента репетиции.
+5. Подставьте боевой `TELEGRAM_BOT_TOKEN` в `.env` и запустите `./deploy.sh`.
 
 Проверьте: `/health` → `{"ok":true}`; в логах «Telegram bot started», без 409;
 `getWebhookInfo` возвращает пустой `url`; в Telegram бот отвечает на `/start`,
