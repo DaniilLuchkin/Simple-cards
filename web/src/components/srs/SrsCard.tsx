@@ -151,8 +151,12 @@ export function SrsCard({
   }
 
   const sectionLabel = "text-xs font-semibold uppercase tracking-wide text-muted";
+  // gap-3/p-5 rather than gap-4/p-6: the back stacks enough blocks that the
+  // spacing alone was costing ~40px, which is a third of the image on a small
+  // phone. overflow-y-auto stays as a safety net for extreme content, but the
+  // layout below is built so it isn't normally reached.
   const faceBase =
-    "absolute inset-0 flex flex-col gap-4 overflow-y-auto rounded-[18px] border-2 border-black bg-surface p-6 [backface-visibility:hidden]";
+    "absolute inset-0 flex flex-col gap-3 overflow-y-auto rounded-[18px] border-2 border-black bg-surface p-5 [backface-visibility:hidden]";
 
   // Nothing to grade while peeking at a card mid-exercise.
   const gradeRow = () =>
@@ -172,13 +176,15 @@ export function SrsCard({
     </div>
   );
 
-  const header = (label: string) => (
+  // showHint=false on the answer side: the same card already carried the hint
+  // on the front, and the back is the crowded face.
+  const header = (label: string, showHint = true) => (
     <div className="flex flex-col gap-1">
       <div className="flex items-center justify-between">
         <span className={sectionLabel}>{label}</span>
         <FlipLink label={t("srsFlip")} onFlip={toggleFlip} />
       </div>
-      {!readOnly && (
+      {showHint && !readOnly && (
         <p className="flex items-center gap-1 text-[11px] text-muted">
           <span aria-hidden>✏️</span> {t("srsEditHint")}
         </p>
@@ -200,7 +206,12 @@ export function SrsCard({
       }}
       {...(readOnly ? {} : editHold)}
       onKeyDown={onCardKeyDown}
-      className="mx-auto h-full min-h-[520px] w-full max-w-sm cursor-pointer select-none outline-none [perspective:1200px]"
+      /* The floor used to be 520px, taller than the space a small phone
+         actually leaves, so the card was pushed past the viewport before its
+         content even mattered. The faces adapt now, so this only needs to keep
+         the card usable where the parent has no height of its own (card
+         detail). */
+      className="mx-auto h-full min-h-[420px] w-full max-w-sm cursor-pointer select-none outline-none [perspective:1200px]"
     >
       <div
         className="relative h-full w-full rounded-[18px] shadow-toon [transform-style:preserve-3d]"
@@ -326,7 +337,7 @@ export function SrsCard({
 
         {/* ---------- BACK ---------- */}
         <div className={`${faceBase} [transform:rotateY(180deg)]`}>
-          {header(t("srsBack"))}
+          {header(t("srsBack"), false)}
 
           <div className="flex flex-wrap items-center gap-3">
             <h2 className="font-serif text-3xl leading-none text-ink">{card.headword}</h2>
@@ -345,45 +356,53 @@ export function SrsCard({
           </div>
 
           <div>
-            <p className="text-lg text-ink">{card.meaning}</p>
-            {card.explanation && <p className="mt-1 text-sm text-muted">{card.explanation}</p>}
+            <p className="text-lg leading-snug text-ink">{card.meaning}</p>
+            {card.explanation && (
+              <p className="mt-1 line-clamp-2 text-sm leading-snug text-muted">{card.explanation}</p>
+            )}
           </div>
 
           {/* The picture belongs on the answer side: it depicts the meaning, so
-              on a recognition front it would hand over the answer. Height is
-              capped because the sentence, chips and grades all sit below it. */}
+              on a recognition front it would hand over the answer. It is also
+              the only elastic block here - everything else has a job that needs
+              its full height, so the image takes whatever is left over and the
+              face fits without scrolling on any screen. Same arrangement as the
+              production front above. */}
           {card.imageUrl && (
-            <img
-              src={card.imageUrl}
-              alt=""
-              className="mx-auto max-h-40 w-auto max-w-full rounded-2xl border-2 border-black object-contain"
-              onError={(e) => (e.currentTarget.style.display = "none")}
-            />
-          )}
-
-          {(card.pos || card.forms.length > 0) && (
-            <div className="flex flex-wrap gap-2 text-sm">
-              {card.pos && (
-                <span className="rounded-full border border-black px-3 py-1 text-ink">{card.pos}</span>
-              )}
-              {card.forms.length > 0 && (
-                <span className="rounded-full border border-black px-3 py-1 font-serif text-ink">
-                  {card.forms.join(" · ")}
-                </span>
-              )}
+            <div className="flex min-h-0 flex-1 items-center justify-center">
+              <img
+                src={card.imageUrl}
+                alt=""
+                className="max-h-full w-auto max-w-full rounded-2xl border-2 border-black object-contain"
+                onError={(e) => (e.currentTarget.style.display = "none")}
+              />
             </div>
           )}
 
-          <p className="font-serif text-lg leading-relaxed text-ink">
+          <p className="font-serif text-lg leading-snug text-ink">
             {cloze.before}
             <span className="rounded-md bg-gap px-1 font-semibold text-ink">{card.headword}</span>
             {cloze.after}
           </p>
 
-          {card.collocations.length > 0 && (
-            <div className="flex flex-wrap gap-2">
+          {/* Grammar and collocations share one wrapped row. They used to be two
+              separate blocks with a gap each, which cost more height than the
+              information deserves - it's reference material you glance at, not
+              the thing being recalled. */}
+          {(card.pos || card.forms.length > 0 || card.collocations.length > 0) && (
+            <div className="flex flex-wrap items-center gap-1.5 text-xs">
+              {card.pos && (
+                <span className="rounded-full border border-black px-2 py-0.5 text-muted">
+                  {localizePos(card.pos, uiLang)}
+                </span>
+              )}
+              {card.forms.length > 0 && (
+                <span className="rounded-full border border-black px-2 py-0.5 font-serif text-ink">
+                  {card.forms.join(" · ")}
+                </span>
+              )}
               {card.collocations.slice(0, 2).map((c) => (
-                <span key={c} className="rounded-full border border-black bg-sky px-3 py-1.5 text-sm text-ink">
+                <span key={c} className="rounded-full border border-black bg-sky px-2 py-0.5 text-ink">
                   {c}
                 </span>
               ))}
@@ -391,12 +410,12 @@ export function SrsCard({
           )}
 
           {card.personalNote && (
-            <div className="border-l-[3px] border-black pl-3">
-              <p className="text-sm italic text-ink">{card.personalNote}</p>
-            </div>
+            <p className="line-clamp-2 border-l-[3px] border-black pl-3 text-sm italic text-ink">
+              {card.personalNote}
+            </p>
           )}
 
-          <div className="mt-auto">{gradeRow()}</div>
+          <div className={card.imageUrl ? "" : "mt-auto"}>{gradeRow()}</div>
         </div>
       </div>
     </div>
