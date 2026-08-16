@@ -1,0 +1,12 @@
+[Unit]
+Description=Check for new Simple Cards commits every 5 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+# Catch up after the machine was off rather than skipping the missed run.
+Persistent=true
+Unit=simple-cards-autodeploy.service
+
+[Install]
+WantedBy=timers.target

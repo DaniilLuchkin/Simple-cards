@@ -162,6 +162,39 @@ OpenRouter: ключ на https://openrouter.ai/keys, модель задаёт�
 → очистка висящих образов. Флаг `--no-pull` собирает из текущего дерева.
 `prisma migrate deploy` выполняется в entrypoint контейнера при каждом старте.
 
+### Автовыкатка
+
+Чтобы не заходить по SSH после каждого коммита, на сервере ставится таймер:
+раз в пять минут он проверяет, не появились ли в отслеживаемой ветке новые
+коммиты, и если появились — запускает тот же `deploy.sh`.
+
+```bash
+sudo cp deploy/systemd/simple-cards-autodeploy.* /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now simple-cards-autodeploy.timer
+
+systemctl list-timers simple-cards-autodeploy.timer
+journalctl -u simple-cards-autodeploy -f
+```
+
+Юниты рассчитаны на пользователя `ubuntu` и путь `/opt/simple-cards/app` —
+если у вас иначе, поправьте `User=` и пути в `.service` перед копированием.
+
+Выключить: `sudo systemctl disable --now simple-cards-autodeploy.timer`.
+Выкатить прямо сейчас, не дожидаясь таймера: `sudo systemctl start
+simple-cards-autodeploy.service` (или просто `./deploy.sh` руками — они
+делают одно и то же).
+
+Таймер systemd, а не cron, выбран из-за одной приятной мелочи: systemd не
+запустит второй экземпляр юнита, пока работает первый, поэтому долгая сборка
+не наложится на следующий тик — блокировка достаётся бесплатно.
+
+Учтите два следствия. Бот перезапускается на каждый пуш в отслеживаемую ветку,
+иногда посреди работы — правда, `bot.stop()` даёт ему дообработать текущий
+апдейт. И если репозиторий приватный, `git fetch` из таймера пойдёт под тем же
+пользователем и возьмёт те же закешированные креды, что и ручной `git pull`;
+если кеша нет, фетч будет падать, и это видно в `journalctl`.
+
 ### Что важно знать
 
 - **Только один экземпляр.** Бот работает через long polling: два процесса с

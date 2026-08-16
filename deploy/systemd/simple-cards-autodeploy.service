@@ -1,0 +1,13 @@
+[Unit]
+Description=Deploy Simple Cards when its branch has new commits
+# A build with no network gets nowhere; wait for it rather than failing loudly.
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/opt/simple-cards/app
+ExecStart=/opt/simple-cards/app/autodeploy.sh
+# A build plus image pull can be slow on a small instance.
+TimeoutStartSec=30min
