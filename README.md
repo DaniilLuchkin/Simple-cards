@@ -149,7 +149,10 @@ OpenRouter: ключ на https://openrouter.ai/keys, модель задаёт�
    git clone <репозиторий> /opt/simple-cards/app
    cd /opt/simple-cards/app
    cp .env.example .env && chmod 600 .env && nano .env
-   # uid пользователя node внутри образа:
+   # Внутри образа приложение работает под пользователем node с uid 1000.
+   # Делайте этот chown ПОСЛЕДНИМ шагом: если до запуска нужно что-то положить
+   # в каталог руками (например перенести картинки со старого хостинга), сначала
+   # закончите с файлами, иначе каталог станет недоступен вашему пользователю.
    sudo chown -R 1000:1000 /opt/simple-cards/uploads
    ./deploy.sh
    ```
